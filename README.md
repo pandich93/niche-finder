@@ -1,5 +1,6 @@
 # niche-finder
 
+[![Stars](https://img.shields.io/github/stars/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/stargazers)
 [![Release](https://img.shields.io/github/v/release/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/pandich93/niche-finder/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/pandich93/niche-finder/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fpandich93%2Fniche-finder%2Fmain%2Fassets%2Fcoverage.json&query=%24.totals.percent_covered_display&suffix=%25&label=coverage&style=flat-square)](assets/coverage.json)
