@@ -3,4 +3,5 @@ __pycache__/
 *.pyc
 .env
 niches.db
+niches.db-journal
 _to_delete/
