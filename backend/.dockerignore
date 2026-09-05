@@ -1,0 +1,16 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+niches.db
+niches.db-*
+*.sqlite
+.git/
+.gitignore
+.DS_Store
+_to_delete/
+.pytest_cache/
+models/
+data/

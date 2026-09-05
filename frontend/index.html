@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>niche-finder</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📈</text></svg>">
+</head>
+<body>
+<svg style="display:none">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 2s5 4.5 5 9a5 5 0 0 1-10 0c0-1.5.5-2.5.5-2.5S5 11 5 14a7 7 0 0 0 14 0c0-6-7-12-7-12z"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 3h8l10 10-8 8L3 11zM7.5 7.5h.01"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2 2 8l10 6 10-6zM2 16l10 6 10-6"/></symbol>
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="9" ry="3"/><path d="M3 6v12c0 1.7 4 3 9 3s9-1.3 9-3V6"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.2a2.8 2.8 0 1 1 3.9 2.5c-1 .5-1.6 1.1-1.6 2.3"/><path d="M12 17.3h.01"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 2v5M15 2v5M7 9h10l-1 5a5 5 0 0 1-10 0z"/><path d="M12 16v6"/></symbol>
+</svg>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">nf</span>
+      <span class="brand-name">niche&#8209;finder</span>
+      <span class="brand-tag" id="brandTag">local</span>
+    </div>
+
+    <nav class="nav" id="nav">
+      <a class="nav-item" href="#/overview"><svg class="ico"><use href="#i-home"/></svg>Обзор</a>
+      <a class="nav-item" href="#/viral"><svg class="ico"><use href="#i-fire"/></svg>Вирусные видео</a>
+      <a class="nav-item" href="#/channels"><svg class="ico"><use href="#i-eye"/></svg>Outlier-каналы</a>
+      <a class="nav-item" href="#/categories"><svg class="ico"><use href="#i-grid"/></svg>Категории</a>
+      <a class="nav-item" href="#/keywords"><svg class="ico"><use href="#i-tag"/></svg>Ключевые слова</a>
+      <a class="nav-item" href="#/tracker"><svg class="ico"><use href="#i-users"/></svg>Трекер каналов</a>
+      <a class="nav-item" href="#/niches"><svg class="ico"><use href="#i-layers"/></svg>Ниши</a>
+      <a class="nav-item" href="#/data"><svg class="ico"><use href="#i-db"/></svg>Данные</a>
+      <a class="nav-item" href="#/help"><svg class="ico"><use href="#i-help"/></svg>Справка и FAQ</a>
+      <a class="nav-item" href="#/mcp"><svg class="ico"><use href="#i-plug"/></svg>MCP-подключение</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <button class="btn btn-ghost" id="themeToggle" type="button">Светлая тема</button>
+      <div class="foot-stat" id="footStat"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="crumbs"><span id="crumbSection">Обзор</span></div>
+      <div class="topbar-right">
+        <label class="field">
+          <span class="field-label">Ниша</span>
+          <select id="globalNiche"><option value="">все</option></select>
+        </label>
+        <label class="field">
+          <span class="field-label">Период</span>
+          <select id="globalPeriod">
+            <option value="24h">24 часа</option>
+            <option value="48h">48 часов</option>
+            <option value="7d">7 дней</option>
+            <option value="30d" selected>30 дней</option>
+            <option value="90d">90 дней</option>
+            <option value="all">всё время</option>
+          </select>
+        </label>
+        <button class="btn" id="reloadBtn" type="button">Обновить</button>
+      </div>
+    </header>
+
+    <div class="view" id="view"><div class="skeleton-page"></div></div>
+  </main>
+</div>
+
+<div class="tooltip" id="tooltip" hidden></div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="app.js" type="module"></script>
+</body>
+</html>

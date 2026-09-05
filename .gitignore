@@ -1,0 +1,12 @@
+.env
+.DS_Store
+data/
+models/
+docs/
+.idea/
+.gitnexus/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/

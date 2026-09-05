@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+niches.db
+_to_delete/
