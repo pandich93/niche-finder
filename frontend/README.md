@@ -5,129 +5,133 @@
 [![Vanilla JS](https://img.shields.io/badge/JS-ES%20modules-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](app.js)
 [![License: MIT](https://img.shields.io/github/license/pandich93/niche-finder?style=flat-square)](../LICENSE)
 
-Дашборд к niche-finder — то же, что показывает NexLev у себя в Niche Finder,
-но по вашей локальной базе и без подписки.
+The dashboard for niche-finder — the same thing NexLev shows in its own
+Niche Finder, but backed by your local database and with no subscription.
 
 ```bash
 cd ~/Desktop/projects/youtube/analytic
-docker compose build            # добавились fastapi + uvicorn
+docker compose build            # picked up fastapi + uvicorn
 docker compose up -d web worker
 open http://localhost:8080
 ```
 
-Без Docker (тот же дашборд, тот же `frontend/`, читает файлы отсюда же):
+Without Docker (the same dashboard, the same `frontend/`, reads files from
+right here):
 
 ```bash
-make local-install   # один раз: venv + зависимости backend
-make dev             # uvicorn api:app --reload на http://localhost:8080
+make local-install   # once: venv + backend dependencies
+make dev             # uvicorn api:app --reload on http://localhost:8080
 ```
 
-Подробнее про запуск без Docker — [backend/README.md](../backend/README.md#запуск-без-docker).
+More on running without Docker —
+[backend/README.md](../backend/README.md#running-without-docker).
 
-## Как устроено
+## How it's built
 
-Никакой сборки: обычные ES-модули, никакого npm, `node_modules` и шага build.
-Правка файла видна после перезагрузки страницы — папка примонтирована в
-контейнер только для чтения, пересобирать образ не нужно.
+No build step: plain ES modules, no npm, no `node_modules`, no build. Edit a
+file and see it after a page reload — the folder is mounted into the
+container read-only, no image rebuild needed.
 
-| Файл | Что внутри |
+| File | What's inside |
 |---|---|
-| `index.html` | каркас: сайдбар, шапка с глобальными фильтрами, контейнер экрана |
-| `styles.css` | тёмная и светлая темы, компоненты |
-| `ui.js` | форматтеры, тултипы, тосты и компоненты (карточки, таблицы, бары, график) |
-| `app.js` | экраны и хеш-роутинг |
+| `index.html` | shell: sidebar, header with global filters, screen container |
+| `styles.css` | dark and light themes, components |
+| `ui.js` | formatters, tooltips, toasts, and components (cards, tables, bars, chart) |
+| `app.js` | screens and hash routing |
 
-Данные берутся из `backend/api.py` (шим над `interfaces/http/api.py`, FastAPI),
-который вызывает ровно те же сценарии, что и MCP-сервер. Никакой логики во
-фронте нет — все метрики считаются на бэкенде, интерфейс их только показывает.
+Data comes from `backend/api.py` (a shim over `interfaces/http/api.py`,
+FastAPI), which calls exactly the same use cases as the MCP server. There's
+no logic in the frontend — every metric is computed on the backend, the UI
+just displays it.
 
-## Экраны
+## Screens
 
-Глобальные фильтры «Ниша» и «Период» в шапке применяются ко всем экранам и
-запоминаются в браузере.
+The "Niche" and "Period" global filters in the header apply to every screen
+and are remembered in the browser.
 
-### Обзор
+### Overview
 
-Всё сразу, одним запросом `/api/overview`: outlier-каналы, будущая
-конкуренция, категории, ключевые слова, вирусные видео.
+Everything at once, in one call to `/api/overview`: outlier channels,
+upcoming competition, categories, keywords, viral videos.
 
-![Обзор](../assets/dashboard.jpg)
+![Overview](../assets/dashboard.jpg)
 
-### Вирусные видео
+### Viral videos
 
-Видео маленьких каналов с фильтрами (подписчики, просмотры, VSR, окно
-публикации) и воронкой снизу: видно, какой именно порог отсёк результаты, а
-не просто пустой список.
+Videos from small channels, with filters (subscribers, views, VSR, publish
+window) and a funnel underneath: shows exactly which threshold filtered out
+the results, instead of just an empty list.
 
-![Вирусные видео](../assets/viral.jpg)
+![Viral videos](../assets/viral.jpg)
 
-### Outlier-каналы
+### Outlier channels
 
-Лучший возрастно-нормированный множитель среди видео канала в окне, против
-медианы его предыдущих загрузок. Полосы силы: <2x, 2–3x, 3–5x, 5–10x, >10x.
+The best age-adjusted multiplier among a channel's videos in the window,
+against the median of its previous uploads. Strength bands: <2x, 2–3x,
+3–5x, 5–10x, >10x.
 
-![Outlier-каналы](../assets/outliers.jpg)
+![Outlier channels](../assets/outliers.jpg)
 
-### Категории
+### Categories
 
-Рейтинг категорий YouTube за период со сдвигом доли против предыдущего окна
-такой же длины — можно ранжировать по просмотрам или по числу каналов.
+YouTube category rankings over a period, with a share shift against the
+previous window of the same length — rank by views or by channel count.
 
-![Категории](../assets/categories.jpg)
+![Categories](../assets/categories.jpg)
 
-### Ключевые слова
+### Keywords
 
-Трендовые фразы: momentum, lift, trendScore, доля видео и медиана просмотров,
-с примером видео на каждую фразу.
+Trending phrases: momentum, lift, trendScore, share of videos, and median
+views, with an example video for each phrase.
 
-![Ключевые слова](../assets/keywords.jpg)
+![Keywords](../assets/keywords.jpg)
 
-### Трекер каналов
+### Channel tracker
 
-Вотчлист, по которому воркер копит историю снимков, плюс формы добавления
-канала (по handle/URL) или сбора по поисковому запросу.
+The watchlist the worker builds snapshot history for, plus forms to add a
+channel (by handle/URL) or collect by search query.
 
-![Трекер каналов](../assets/tracker.jpg)
+![Channel tracker](../assets/tracker.jpg)
 
-### Ниши
+### Niches
 
-Всё, что собрано под пользовательскими ярлыками (слаг + исходный запрос),
-с числом видео и временем последнего сбора по каждой нише.
+Everything collected under user-defined labels (a slug plus the original
+query), with video counts and the last collection time for each niche.
 
-![Ниши](../assets/niches.jpg)
+![Niches](../assets/niches.jpg)
 
-### Канал
+### Channel
 
-Детальный разбор одного канала: подписчики, просмотры, медиана на видео,
-скорость роста по окнам (24ч/7д/30д) и оценка дохода. График «просмотры во
-времени» строится из снимков воркера, потому что YouTube API отдаёт только
-состояние «прямо сейчас» — на скрине ниже видно состояние с одним снимком,
-до того как график набрал историю.
+A detailed breakdown of one channel: subscribers, views, median per video,
+growth rate by window (24h/7d/30d), and a revenue estimate. The "views over
+time" chart is built from the worker's snapshots, because the YouTube API
+only ever returns the state "right now" — the screenshot below shows the
+state with a single snapshot, before the chart has built up any history.
 
-![Канал](../assets/channel.jpg)
+![Channel](../assets/channel.jpg)
 
-### Данные
+### Data
 
-Состояние ключа, базы и истории (сколько каналов/видео/снимков собрано) плюс
-те же формы сбора и ручное обновление статистики.
+Key, database, and history state (how many channels/videos/snapshots have
+been collected), plus the same collection forms and a manual stats refresh.
 
-![Данные](../assets/data.jpg)
+![Data](../assets/data.jpg)
 
-## Безопасность
+## Security
 
-Сервис слушает `127.0.0.1` — внутри контейнера лежит ваш ключ YouTube, и
-выставлять его в локальную сеть незачем. Порт меняется через `WEB_PORT` в
-`.env`. POST-эндпоинты (`/api/collect/*`, `/api/refresh`) тратят квоту, GET —
-нет.
+The service listens on `127.0.0.1` — your YouTube key lives inside the
+container, and there's no reason to expose it to the local network. The
+port is changed via `WEB_PORT` in `.env`. POST endpoints (`/api/collect/*`,
+`/api/refresh`) spend quota, GET endpoints don't.
 
-## Оформление
+## Design
 
-Палитра — валидированный набор из скилла `dataviz`: магнитуда рисуется одной
-серией (синий), поэтому легенда не нужна; статусные цвета применяются только к
-дельтам и всегда идут со знаком и подписью, так что смысл никогда не держится
-на одном лишь цвете. Тёмная и светлая темы — отдельные наборы значений под свою
-подложку, а не автоматическая инверсия.
+The palette is a validated set from the `dataviz` skill: magnitude is drawn
+with a single series (blue), so no legend is needed; status colors are only
+applied to deltas and always come with a sign and a label, so meaning never
+rests on color alone. Dark and light themes are separate sets of values
+tuned to their own background, not an automatic inversion.
 
 ## API
 
-Схема живая: `http://localhost:8080/api/docs`.
+Live schema: `http://localhost:8080/api/docs`.

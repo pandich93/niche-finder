@@ -10,128 +10,129 @@
 [![MCP](https://img.shields.io/badge/MCP-24%20tools-8A2BE2?style=flat-square)](backend/interfaces/mcp/server.py)
 [![Last commit](https://img.shields.io/github/last-commit/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/commits/main)
 
-Свой аналог NexLev / vidIQ / ViewStats: поиск ниш, вирусных видео у маленьких
-каналов, трендовых категорий и ключевых слов за произвольные периоды (24 часа,
-48 часов, 7/30/90 дней), плюс полноценный трекинг и разбор YouTube-каналов.
-Работает на бесплатном YouTube Data API v3 и локальном PostgreSQL — никакой
-подписки, никакого платного LLM-ключа: классификацию вида «faceless / подходит
-по смыслу» делает модель, которая вызывает эти инструменты, а не сервер.
+A self-hosted alternative to NexLev / vidIQ / ViewStats: find niches, viral
+videos from small channels, trending categories and keywords over arbitrary
+periods (24h, 48h, 7/30/90 days), plus full channel tracking and analytics.
+Runs on the free YouTube Data API v3 and a local PostgreSQL — no
+subscription, no paid LLM key: semantic classification like "faceless / on
+topic" is done by the model calling these tools, not the server.
 
-![Дашборд niche-finder: обзор — каналы, видео, outlier-каналы, трендовые категории и ключевые слова](assets/dashboard.jpg)
+![niche-finder dashboard: overview — channels, videos, outlier channels, trending categories and keywords](assets/dashboard.jpg)
 
-У проекта две части, которые вместе и составляют «продукт»:
+The project has two parts that together make up the "product":
 
-- **`backend/`** — Python: MCP-сервер (24 инструмента для Claude), HTTP API
-  для дашборда и фоновый воркер, который пишет историю просмотров/подписчиков
-  по расписанию (без этого не существует «скорость роста за 24 часа» — YouTube
-  API отдаёт только «сейчас»).
-- **`frontend/`** — тот же функционал, но глазами: дашборд на чистых ES-модулях
-  (без npm и шага сборки), который дёргает HTTP API backend'а.
+- **`backend/`** — Python: an MCP server (24 tools for Claude), an HTTP API
+  for the dashboard, and a background worker that logs view/subscriber
+  history on a schedule (without this, "growth rate over 24 hours" doesn't
+  exist — the YouTube API only ever returns "right now").
+- **`frontend/`** — the same functionality, but visual: a dashboard built on
+  plain ES modules (no npm, no build step) that calls the backend's HTTP API.
 
-Обе части и хранилище Postgres запускаются вместе одной командой (см. ниже) —
-дашборд и Claude Desktop в итоге смотрят в одну и ту же базу.
+Both parts and the Postgres store come up together with one command (see
+below) — the dashboard and Claude Desktop end up looking at the same
+database.
 
-## Возможности
+## Features
 
-- Поиск вирусных видео и outlier-каналов по нише за произвольный период
-  (24ч / 48ч / 7 / 30 / 90 дней)
-- Трендовые категории и ключевые слова, лучшее время публикации, паттерны
-  заголовков
-- Трекинг конкретных каналов: скорость роста просмотров/подписчиков, история
-  снапшотов
-- Один и тот же расчёт в Claude Desktop (через MCP) и на веб-дашборде —
-  общая кодовая база, не две реализации
-- Только бесплатный YouTube Data API v3 и локальный PostgreSQL — без платных
-  подписок и без LLM-ключа на стороне сервера
+- Find viral videos and outlier channels by niche over an arbitrary period
+  (24h / 48h / 7 / 30 / 90 days)
+- Trending categories and keywords, best time to publish, title patterns
+- Track specific channels: view/subscriber growth rate, snapshot history
+- The exact same calculation in Claude Desktop (via MCP) and on the web
+  dashboard — one shared codebase, not two implementations
+- Only the free YouTube Data API v3 and local PostgreSQL — no paid
+  subscriptions and no LLM key on the server side
 
-## Содержание
+## Table of Contents
 
-- [Экраны](#экраны)
-- [Как это устроено](#как-это-устроено)
-- [Быстрый старт](#быстрый-старт)
-- [Структура репозитория](#структура-репозитория)
-- [Дальше читать](#дальше-читать)
+- [Screens](#screens)
+- [How it works](#how-it-works)
+- [Quick start](#quick-start)
+- [Repository layout](#repository-layout)
+- [Read next](#read-next)
 
-## Экраны
+## Screens
 
 <table>
 <tr>
-<td width="50%"><img src="assets/viral.jpg" alt="Вирусные видео у маленьких каналов"><br><sub>Вирусные видео — маленькие каналы, выстрелившие сильнее ожидаемого</sub></td>
-<td width="50%"><img src="assets/outliers.jpg" alt="Outlier-каналы"><br><sub>Outlier-каналы — множитель лучшего видео против медианы канала</sub></td>
+<td width="50%"><img src="assets/viral.jpg" alt="Viral videos from small channels"><br><sub>Viral videos — small channels that overperformed expectations</sub></td>
+<td width="50%"><img src="assets/outliers.jpg" alt="Outlier channels"><br><sub>Outlier channels — best video's multiplier against the channel's median</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/categories.jpg" alt="Категории"><br><sub>Категории — доля и рост по нишам YouTube</sub></td>
-<td width="50%"><img src="assets/keywords.jpg" alt="Ключевые слова"><br><sub>Ключевые слова — trendScore, lift, momentum</sub></td>
+<td width="50%"><img src="assets/categories.jpg" alt="Categories"><br><sub>Categories — share and growth across YouTube niches</sub></td>
+<td width="50%"><img src="assets/keywords.jpg" alt="Keywords"><br><sub>Keywords — trendScore, lift, momentum</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/tracker.jpg" alt="Трекер каналов"><br><sub>Трекер каналов — сбор и отслеживание конкретных каналов</sub></td>
-<td width="50%"><img src="assets/niches.jpg" alt="Ниши"><br><sub>Ниши — всё, что собрано под пользовательскими ярлыками</sub></td>
+<td width="50%"><img src="assets/tracker.jpg" alt="Channel tracker"><br><sub>Channel tracker — collect and follow specific channels</sub></td>
+<td width="50%"><img src="assets/niches.jpg" alt="Niches"><br><sub>Niches — everything collected under user-defined labels</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/data.jpg" alt="Данные"><br><sub>Данные — состояние базы и ручной сбор/обновление статистики</sub></td>
+<td width="50%"><img src="assets/data.jpg" alt="Data"><br><sub>Data — database state and manual collection/refresh</sub></td>
 <td width="50%"></td>
 </tr>
 </table>
 
-## Как это устроено
+## How it works
 
 ```mermaid
 flowchart LR
-    CD["Claude Desktop"] -->|MCP| MCP["MCP-сервер\nbackend/server.py"]
-    FE["Браузер / frontend"] -->|HTTP| API["HTTP API\nbackend/api.py"]
-    YT["YouTube Data API v3"] <-->|"по расписанию"| W["Фоновый воркер\nbackend/worker.py"]
+    CD["Claude Desktop"] -->|MCP| MCP["MCP server\nbackend/server.py"]
+    FE["Browser / frontend"] -->|HTTP| API["HTTP API\nbackend/api.py"]
+    YT["YouTube Data API v3"] <-->|"on schedule"| W["Background worker\nbackend/worker.py"]
     MCP --> PG[("PostgreSQL")]
     API --> PG
     W --> PG
 ```
 
-MCP-сервер, HTTP API и воркер — это три разных входа в один и тот же код:
-все три вызывают одни и те же сценарии из `backend/application/`, поэтому
-результат в Claude Desktop и на дашборде — буквально один и тот же расчёт,
-а не две отдельные реализации. Подробный разбор слоёв backend'а (с 5 сентября
-2026 — DDD: domain → infrastructure → application → interfaces) — в
-[backend/README.md](backend/README.md#структура).
+The MCP server, HTTP API, and worker are three different entry points into
+the same code: all three call the same use cases from `backend/application/`,
+so the result in Claude Desktop and on the dashboard is literally the same
+calculation — not two separate implementations. A detailed breakdown of the
+backend's layers (as of September 5, 2026 — DDD: domain → infrastructure →
+application → interfaces) is in
+[backend/README.md](backend/README.md#structure).
 
-## Быстрый старт
+## Quick start
 
-Через Docker (рекомендуется — поднимает Postgres, воркер и дашборд разом):
+With Docker (recommended — brings up Postgres, the worker, and the dashboard
+together):
 
 ```bash
-cp .env.example .env          # впишите YOUTUBE_API_KEY (не обязателен для сборки)
+cp .env.example .env          # fill in YOUTUBE_API_KEY (not required to build)
 docker compose build
-make up                       # или: docker compose up -d web worker
-make doctor                   # проверить ключ, сеть и базу
-open http://localhost:8080    # дашборд
+make up                       # or: docker compose up -d web worker
+make doctor                   # check the key, network, and database
+open http://localhost:8080    # dashboard
 ```
 
-Без Docker (нужен свой доступный Postgres):
+Without Docker (needs your own reachable Postgres):
 
 ```bash
-make local-install            # venv + зависимости backend, один раз
-make dev                      # HTTP-дашборд на http://localhost:8080
-make local-run                # или: MCP-сервер на хосте, для Claude Desktop
+make local-install            # venv + backend dependencies, once
+make dev                      # HTTP dashboard on http://localhost:8080
+make local-run                # or: MCP server on the host, for Claude Desktop
 ```
 
-`make help` печатает все доступные команды с однострочным описанием каждой.
+`make help` prints every available command with a one-line description.
 
-## Структура репозитория
+## Repository layout
 
-| Путь | Что внутри |
+| Path | What's inside |
 |---|---|
-| [`backend/`](backend/README.md) | MCP-сервер, HTTP API, воркер — вся логика и хранение данных |
-| [`frontend/`](frontend/README.md) | дашборд: index.html, styles.css, ui.js, app.js |
-| `docker-compose.yml` | postgres + worker + web + mcp/mcp-http сервисы |
-| `Makefile` | команды запуска что через Docker, что напрямую на хосте |
-| `.env.example` | ключ YouTube и настройки воркера |
-| `scripts/mcp-docker.sh` | лончер MCP-сервера в Docker для Claude Desktop |
+| [`backend/`](backend/README.md) | MCP server, HTTP API, worker — all the logic and data storage |
+| [`frontend/`](frontend/README.md) | dashboard: index.html, styles.css, ui.js, app.js |
+| `docker-compose.yml` | postgres + worker + web + mcp/mcp-http services |
+| `Makefile` | commands to run everything, via Docker or straight on the host |
+| `.env.example` | YouTube key and worker settings |
+| `scripts/mcp-docker.sh` | MCP server launcher in Docker for Claude Desktop |
 
-`docs/` (история решений и разбор рынка) — внутренние заметки, в этот
-репозиторий не входят.
+`docs/` (decision history and market research) — internal notes, not
+included in this repository.
 
-## Дальше читать
+## Read next
 
-- [backend/README.md](backend/README.md) — квоты YouTube API, все 24
-  инструмента с описанием, как читать `period_by`, запуск с Docker и без,
-  структура DDD-слоёв.
-- [frontend/README.md](frontend/README.md) — экраны дашборда, откуда берутся
-  данные, как устроена палитра.
+- [backend/README.md](backend/README.md) — YouTube API quotas, all 24 tools
+  with descriptions, how to read `period_by`, running with and without
+  Docker, the DDD layer structure.
+- [frontend/README.md](frontend/README.md) — dashboard screens, where the
+  data comes from, how the palette is built.

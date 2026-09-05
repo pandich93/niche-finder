@@ -7,87 +7,90 @@
 [![PostgreSQL 16](https://img.shields.io/badge/postgres-16-336791?style=flat-square&logo=postgresql&logoColor=white)](../docker-compose.yml)
 [![MCP](https://img.shields.io/badge/MCP-24%20tools-8A2BE2?style=flat-square)](interfaces/mcp/server.py)
 
-Свой аналог NexLev / vidIQ / ViewStats: поиск ниш, вирусных видео у маленьких
-каналов, трендовых категорий и ключевых слов **за произвольные периоды**
-(24 часа, 48 часов, 7/30/90 дней), плюс полноценный трекинг и разбор каналов.
-Всё на бесплатном YouTube Data API v3 и локальном PostgreSQL.
+A self-hosted alternative to NexLev / vidIQ / ViewStats: find niches, viral
+videos from small channels, trending categories and keywords **over
+arbitrary periods** (24h, 48h, 7/30/90 days), plus full channel tracking and
+analytics. All on the free YouTube Data API v3 and local PostgreSQL.
 
-Классификацию вида «faceless / AI / подходит по смыслу» делает не сервер, а
-модель, которая вызывает эти инструменты: сервер отдаёт сырые заголовки,
-описания и обложки, решение принимается в диалоге. Отдельный платный ключ к
-LLM не нужен.
+Classification like "faceless / AI / on topic" isn't done by the server —
+it's done by the model calling these tools: the server returns raw titles,
+descriptions, and thumbnails, and the decision gets made in the
+conversation. No separate paid LLM key is needed.
 
-Разбор рынка и формулы конкурентов (`docs/research-tools.md`) — внутренние
-заметки, в этот репозиторий не входят.
+Market research and competitor formulas (`docs/research-tools.md`) are
+internal notes, not included in this repository.
 
 ---
 
-## Главное про квоты (изменилось 1 июня 2026)
+## Quota essentials (changed June 1, 2026)
 
-| Метод | Стоимость |
+| Method | Cost |
 |---|---|
-| `search.list` | 1 unit, но **всего 100 вызовов в сутки**, отдельная корзина |
-| всё остальное | 1 unit из общего пула на **10 000 units в сутки** |
+| `search.list` | 1 unit, but **only 100 calls a day**, a separate bucket |
+| everything else | 1 unit out of the shared pool of **10,000 units a day** |
 
-Поиск — дефицит, чтение — почти бесплатно. Поэтому:
+Search is scarce, reading is nearly free. So:
 
-- `collect_niche` — единственный, кто тратит поиск. Используйте для новых тем.
-- `collect_channel` — идёт через uploads-плейлист: **1 unit за 50 видео**, без
-  обрезки на 500 результатах, поиск не трогает. Основной способ набрать корпус.
-- `refresh_stats` — через `videos.batchGetStats`, ~1 unit за 50 видео.
+- `collect_niche` — the only one that spends search. Use it for new topics.
+- `collect_channel` — goes through the uploads playlist: **1 unit per 50
+  videos**, no 500-result cap, doesn't touch search. The main way to build
+  up the corpus.
+- `refresh_stats` — via `videos.batchGetStats`, ~1 unit per 50 videos.
 
-Каждый сборщик возвращает поле `quota` с фактическим расходом.
+Every collector returns a `quota` field with the actual spend.
 
-И ещё: с 21 июля 2025 `chart=mostPopular` отдаёт только чарты Музыки, Фильмов
-и Игр — общей вкладки Trending у YouTube больше нет. Поэтому
-`most_popular_categories` и `trending_keywords` считаются по вашему
-собственному корпусу, а не по чарту.
+Also: since July 21, 2025 `chart=mostPopular` only returns Music, Movies, and
+Gaming charts — YouTube no longer has a general Trending tab. So
+`most_popular_categories` and `trending_keywords` are computed from your own
+corpus, not from the chart.
 
 ---
 
-## Запуск в Docker (рекомендуется)
+## Running with Docker (recommended)
 
 ```bash
 cd ~/Desktop/projects/youtube/analytic
-cp .env.example .env          # впишите YOUTUBE_API_KEY — без него соберётся,
-                              # но собирать данные будет нечем
+cp .env.example .env          # fill in YOUTUBE_API_KEY — it builds without
+                              # one, but there'll be nothing to collect with
 docker compose build
-docker compose up -d web worker   # поднимет и postgres тоже (depends_on)
-open http://localhost:8080        # или make open
+docker compose up -d web worker   # also brings up postgres (depends_on)
+open http://localhost:8080        # or: make open
 docker compose logs -f worker
 ```
 
-Обновляетесь со старой SQLite-версии и хотите сохранить собранные данные?
-`python3 backend/migrate_sqlite_to_postgres.py path/to/old/niches.db` (один
-раз, после `docker compose up -d postgres`; безопасно запускать повторно).
+Upgrading from the old SQLite version and want to keep your collected data?
+`python3 backend/migrate_sqlite_to_postgres.py path/to/old/niches.db` (once,
+after `docker compose up -d postgres`; safe to run again).
 
-Дашборд — это `frontend/`, см. [frontend/README.md](../frontend/README.md).
-Он показывает те же секции, что и MCP-инструменты, и слушает только localhost.
+The dashboard is `frontend/`, see [frontend/README.md](../frontend/README.md).
+It shows the same sections as the MCP tools, and only listens on localhost.
 
-Ключ нужен только на запуске, не на сборке: `docker compose build` проходит и с
-пустым `.env`. Если ключа нет, воркер скажет об этом и выйдет, а инструменты
-чтения продолжат работать по тому, что уже собрано.
+The key is only needed at runtime, not at build time: `docker compose build`
+works fine with an empty `.env`. If there's no key, the worker says so and
+exits, while the read tools keep working off whatever's already collected.
 
-Воркер — не опция, а необходимость: YouTube API отдаёт только «сколько
-просмотров прямо сейчас». Скорость набора просмотров, ускорение, рост
-подписчиков, сравнение периодов и детект смены обложки существуют только
-потому, что кто-то регулярно записывает цифры. Этим и занимается воркер.
+The worker isn't optional, it's a requirement: the YouTube API only ever
+returns "how many views right now". View-gain speed, acceleration,
+subscriber growth, period comparisons, and thumbnail/title-change detection
+only exist because something is regularly recording the numbers. That's the
+worker's job.
 
-Подключение к Claude Desktop — в
+Claude Desktop connection — in
 `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "niche-finder": {
-      "command": "/Users/kamola/Desktop/projects/youtube/analytic/scripts/mcp-docker.sh"
+      "command": "/path/to/niche-finder/scripts/mcp-docker.sh"
     }
   }
 }
 ```
 
-Скрипт сам подставит `--env-file` и подключит те же тома, что и воркер, так
-что инструменты сразу видят всё собранное. Если хотите без скрипта:
+The script fills in `--env-file` itself and mounts the same volumes as the
+worker, so the tools immediately see everything already collected. Without
+the script:
 
 ```json
 {
@@ -96,7 +99,7 @@ docker compose logs -f worker
       "command": "docker",
       "args": ["run", "--rm", "-i",
                "--network", "niche-finder_default",
-               "--env-file", "/Users/kamola/Desktop/projects/youtube/analytic/.env",
+               "--env-file", "/path/to/niche-finder/.env",
                "-v", "niche-finder-models:/models",
                "niche-finder:latest", "python", "server.py"]
     }
@@ -104,218 +107,228 @@ docker compose logs -f worker
 }
 ```
 
-### Если сборка падает на Docker Hub
+### If the build fails at Docker Hub
 
 ```
 failed to fetch anonymous token: ... lookup auth.docker.io: i/o timeout
 ```
 
-Это сеть, а не код: Docker не может достучаться до реестра образов. Чаще всего
-виноват включённый VPN (корпоративные клиенты вроде AnyConnect регулярно
-заворачивают или роняют трафик к registry) — отключите и повторите. Если VPN ни
-при чём, перезапустите Docker Desktop: `i/o timeout` именно на `auth.docker.io`
-почти всегда лечится этим. Проверить, в Docker ли дело:
+This is a network issue, not a code issue: Docker can't reach the image
+registry. The usual culprit is an active VPN (corporate clients like
+AnyConnect regularly tunnel or drop traffic to the registry) — turn it off
+and retry. If it's not the VPN, restart Docker Desktop: an `i/o timeout`
+specifically on `auth.docker.io` is almost always fixed by that. To check
+whether it's Docker:
 
 ```bash
-curl -sI https://auth.docker.io/token | head -1   # с Mac напрямую
-docker pull hello-world                            # через Docker
+curl -sI https://auth.docker.io/token | head -1   # directly from the Mac
+docker pull hello-world                            # through Docker
 ```
 
-Если первое работает, а второе нет — проблема в DNS Docker Desktop.
+If the first one works and the second doesn't, the problem is Docker
+Desktop's DNS.
 
-**Пересборка при этом почти никогда не нужна.** Все сервисы запускают код прямо
-из `backend/` и `frontend/` (папки смонтированы в контейнер только для чтения),
-поэтому образ нужен лишь ради Python и зависимостей. `docker compose build`
-обязателен только когда меняется `requirements.txt`; в остальных случаях хватает
-`docker compose restart`. А если образ собран старой версией `requirements.txt`,
-web-сервис доставит недостающие `fastapi`/`uvicorn` с pypi при старте сам —
-pypi.org и registry.docker.io это разные хосты, и первый обычно доступен, даже
-когда второй нет.
+**Rebuilding is almost never needed.** Every service runs code straight from
+`backend/` and `frontend/` (the folders are mounted into the container
+read-only), so the image only exists for Python and its dependencies.
+`docker compose build` is only required when `requirements.txt` changes;
+otherwise `docker compose restart` is enough. And if the image was built
+from an older `requirements.txt`, the web service fetches the missing
+`fastapi`/`uvicorn` from PyPI at startup on its own — pypi.org and
+registry.docker.io are different hosts, and the former is usually reachable
+even when the latter isn't.
 
-### Первым делом — `doctor`
+### First thing to run — `doctor`
 
 ```bash
 docker compose run --rm mcp python cli.py doctor
-# или просто: make doctor
+# or simply: make doctor
 ```
 
-Он по порядку проверяет ключ (форму и что API реально отвечает), доступность
-`googleapis.com`, состояние базы и покрытие окна 24 часа — и в конце печатает
-список того, что чинить, конкретными словами: не включён YouTube Data API v3,
-ограничение по IP/referrer у ключа, исчерпана квота, пустая база, нет истории.
-Одна проверка стоит 1 unit квоты.
+It checks, in order: the key (its shape, and whether the API actually
+responds), reachability of `googleapis.com`, database state, and 24-hour
+window coverage — then prints, in plain words, exactly what to fix: YouTube
+Data API v3 not enabled, an IP/referrer restriction on the key, exhausted
+quota, an empty database, no history. One check costs 1 quota unit.
 
-### CLI: всё то же самое без Claude Desktop
+### CLI: everything, without Claude Desktop
 
 ```bash
-make cli ARGS="collect-channel @somechannel"      # набрать корпус, дёшево
+make cli ARGS="collect-channel @somechannel"      # build up the corpus, cheap
 make cli ARGS="collect 'ai automation' --period 24h"
-make cli ARGS="refresh"                           # обновить счётчики → история
+make cli ARGS="refresh"                           # refresh counters → history
 make cli ARGS="viral --period 24h"
 make cli ARGS="viral --period 24h --period-by discovered"
 make cli ARGS="categories --period 7d --rank-by channels"
 make cli ARGS="keywords --period 24h"
-make cli ARGS="channels --period 24h"             # outlier-каналы
-make cli ARGS="seed"                              # синтетика, чтобы просто посмотреть
+make cli ARGS="channels --period 24h"             # outlier channels
+make cli ARGS="seed"                              # synthetic data, just to look around
 ```
 
-Полезные команды (`make help` покажет все):
+Useful commands (`make help` shows all of them):
 
 ```bash
-make up          # поднять воркер
-make logs        # смотреть, что он собирает
-make test        # смоук-тесты внутри образа, без ключа и без сети
-make seed        # налить синтетические данные и пощупать инструменты
-make stats       # что сейчас в базе
-make http        # поднять MCP по HTTP на :8765 вместо stdio
+make up          # bring up the worker
+make logs        # watch what it's collecting
+make test        # smoke tests inside the image, no key and no network needed
+make seed        # load synthetic data and try the tools
+make stats       # what's currently in the database
+make http        # run MCP over HTTP on :8765 instead of stdio
 ```
 
-Сервис `mcp` (то есть `make cli` и `make doctor`) монтирует `./backend` внутрь
-контейнера только для чтения, поэтому правки в коде видны сразу, без пересборки.
-Воркер, `mcp-http` и `scripts/mcp-docker.sh` работают с кодом, запечённым в
-образ — для них нужен `docker compose build`.
+The `mcp` service (i.e. `make cli` and `make doctor`) mounts `./backend`
+into the container read-only, so code edits show up immediately, no rebuild
+needed. The worker, `mcp-http`, and `scripts/mcp-docker.sh` run code baked
+into the image — those need `docker compose build`.
 
-База лежит в томе `niche-finder-postgres-data` (сервис `postgres`), кэш модели
-эмбеддингов — в `niche-finder-models`. Пересборка образа их не трогает.
+The database lives in the `niche-finder-postgres-data` volume (the
+`postgres` service); the embeddings model cache is in `niche-finder-models`.
+Rebuilding the image doesn't touch either.
 
-`docker compose build --build-arg PREFETCH_MODEL=1` запечёт модель
-эмбеддингов (~220 МБ) прямо в образ, если не хотите ждать скачивания при
-первом семантическом поиске.
+`docker compose build --build-arg PREFETCH_MODEL=1` bakes the embeddings
+model (~220 MB) straight into the image, if you don't want to wait for it to
+download on the first semantic search.
 
 ---
 
-## Запуск без Docker
+## Running without Docker
 
 ```bash
 cd ~/Desktop/projects/youtube/analytic/backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # впишите YOUTUBE_API_KEY
-python3 tests/test_smoke.py   # должно быть 17/17 passed -- нужен доступный Postgres
-                              # (docker compose up -d postgres, или свой; см. infrastructure/postgres/connection.py)
+cp .env.example .env          # fill in YOUTUBE_API_KEY
+python3 tests/test_smoke.py   # should be 17/17 passed -- needs a reachable
+                              # Postgres (docker compose up -d postgres, or
+                              # your own; see infrastructure/postgres/connection.py)
 ```
 
-То же самое короче, через Makefile (из корня проекта):
+Same thing, shorter, via the Makefile (from the project root):
 
 ```bash
-make local-install   # venv + зависимости, один раз
-make local-test      # смоук-тесты на хосте
-make local-run       # MCP-сервер на хосте (без Docker)
-make dev             # HTTP-дашборд на хосте: uvicorn api:app --reload на :8080
+make local-install   # venv + dependencies, once
+make local-test      # smoke tests on the host
+make local-run       # MCP server on the host (no Docker)
+make dev             # HTTP dashboard on the host: uvicorn api:app --reload on :8080
 ```
 
-Конфиг Claude Desktop:
+Claude Desktop config:
 
 ```json
 {
   "mcpServers": {
     "niche-finder": {
-      "command": "/Users/kamola/Desktop/projects/youtube/analytic/backend/.venv/bin/python3",
-      "args": ["/Users/kamola/Desktop/projects/youtube/analytic/backend/server.py"]
+      "command": "/path/to/niche-finder/backend/.venv/bin/python3",
+      "args": ["/path/to/niche-finder/backend/server.py"]
     }
   }
 }
 ```
 
-История в этом режиме не собирается сама — запускайте `python3 worker.py`
-отдельно (или по cron), иначе поля скорости останутся пустыми.
+History isn't collected automatically in this mode — run `python3 worker.py`
+separately (or via cron), otherwise the velocity fields stay empty.
 
 ---
 
-## Инструменты
+## Tools
 
-### Сбор (тратят квоту)
+### Collection (spends quota)
 
-| Инструмент | Что делает | Цена |
+| Tool | What it does | Cost |
 |---|---|---|
-| `collect_niche` | поиск по теме → видео + каналы + эмбеддинги в базу. `period="24h"` вместо ручной даты | 1 поиск/страница из 100 в сутки |
-| `collect_channel` | загрузки канала через uploads-плейлист; принимает UC-id, @handle или URL | ~1 unit / 50 видео |
-| `collect_trending` | снапшот чарта mostPopular (Музыка/Фильмы/Игры) | ~1 unit / страница |
-| `refresh_stats` | перечитать счётчики и дописать снапшот — то, из чего берутся скорости | ~1 unit / 50 видео |
-| `refresh_channels` | снапшот подписчиков/просмотров каналов | ~1 unit / 50 каналов |
-| `refresh_categories` | актуальная карта id → название категории | 1 unit / регион |
+| `collect_niche` | search by topic → videos + channels + embeddings into the database. `period="24h"` instead of a manual date | 1 search/page out of 100 a day |
+| `collect_channel` | a channel's uploads via its uploads playlist; accepts a UC id, @handle, or URL | ~1 unit / 50 videos |
+| `collect_trending` | a snapshot of the mostPopular chart (Music/Movies/Gaming) | ~1 unit / page |
+| `refresh_stats` | re-read counters and append a snapshot — this is where velocity numbers come from | ~1 unit / 50 videos |
+| `refresh_channels` | a snapshot of channel subscribers/views | ~1 unit / 50 channels |
+| `refresh_categories` | an up-to-date id → category-name map | 1 unit / region |
 
-### Разделы (бесплатно, сколько угодно)
+### Sections (free, run as much as you like)
 
-| Инструмент | Что даёт |
+| Tool | What it gives you |
 |---|---|
-| `viral_videos_small_channels` | вирусные видео у маленьких каналов за период; VSR, age-adjusted outlier, VPH, ускорение |
-| `recently_added_outlier_channels` | то же, но на уровне каналов: множитель + полоса силы 0–4 |
-| `high_future_competition` | молодые быстрорастущие каналы, которые вот-вот станут вашими конкурентами |
-| `most_popular_categories` | рейтинг категорий за период + сдвиг доли против предыдущего окна; `rank_by="views"` или `"channels"` |
-| `trending_keywords` | растущие фразы с momentum и outlier-lift |
-| `search_outliers` | outlier-поиск по базе, с семантическим ранжированием по `query` |
-| `niche_overview` | насыщенность ниши: распределение каналов по размеру, viral skew, доля Shorts |
-| `list_niches`, `db_stats` | что собрано |
-| `data_coverage` | хватает ли данных на запрошенное окно — вызывайте первым, если раздел пустой |
+| `viral_videos_small_channels` | viral videos on small channels over a period; VSR, age-adjusted outlier, VPH, acceleration |
+| `recently_added_outlier_channels` | the same, at the channel level: multiplier + strength band 0–4 |
+| `high_future_competition` | young, fast-growing channels about to become your competitors |
+| `most_popular_categories` | category ranking over a period + share shift vs. the previous window; `rank_by="views"` or `"channels"` |
+| `trending_keywords` | growing phrases with momentum and outlier-lift |
+| `search_outliers` | outlier search over the database, semantically ranked by `query` |
+| `niche_overview` | niche density: channel-size distribution, viral skew, Shorts share |
+| `list_niches`, `db_stats` | what's been collected |
+| `data_coverage` | whether there's enough data for the requested window — call this first if a section comes back empty |
 
-### Трекинг и анализ каналов
+### Channel tracking and analysis
 
-| Инструмент | Что даёт |
+| Tool | What it gives you |
 |---|---|
-| `track_channel` / `untrack_channel` / `list_tracked_channels` | вотчлист для истории |
-| `channel_analytics` | профиль, каденс, медиана vs среднее, viral skew, рост 24h/7d/30d/90d, momentum, грейд, проекции, две модели дохода, топ-outliers |
-| `compare_channels` | сравнение, ранжирование по просмотрам на подписчика |
-| `channel_velocity` | VPH lifetime, VPH за 24ч, прирост за сутки, «разгоняется / затухает» |
-| `title_changes` | кто переименовал видео или сменил обложку |
-| `best_time_to_publish` | 168 слотов недели по медианному age-adjusted outlier |
-| `title_patterns` | какие фразы в заголовках коррелируют с пробитиями |
-| `calibrate_maturity_curve` | пересчитать кривую зрелости по своим данным |
+| `track_channel` / `untrack_channel` / `list_tracked_channels` | a watchlist for history |
+| `channel_analytics` | profile, cadence, median vs. mean, viral skew, 24h/7d/30d/90d growth, momentum, grade, projections, two revenue models, top outliers |
+| `compare_channels` | comparison, ranked by views per subscriber |
+| `channel_velocity` | lifetime VPH, 24h VPH, daily gain, "accelerating / decelerating" |
+| `title_changes` | who renamed a video or swapped its thumbnail |
+| `best_time_to_publish` | 168 weekly slots by median age-adjusted outlier |
+| `title_patterns` | which title phrases correlate with breakouts |
+| `calibrate_maturity_curve` | recompute the maturity curve from your own data |
 
 ---
 
-## Как этим пользоваться
+## How to use this
 
-**День первый — набрать корпус.** Дешёвый путь: найдите 20–50 каналов в вашей
-теме и залейте их через `collect_channel` (это ~1 unit за 50 видео, поиск не
-тратится). Дорогой, но нужный для открытия новых тем — `collect_niche`.
+**Day one — build up the corpus.** The cheap path: find 20–50 channels in
+your topic and load them via `collect_channel` (that's ~1 unit per 50
+videos, doesn't spend search). The expensive path, but necessary for
+discovering new topics, is `collect_niche`.
 
 ```
-collect_niche(query="гипотезы о мозге и памяти", label="brain", language="ru", period="30d", pages=2)
+collect_niche(query="hypotheses about the brain and memory", label="brain", language="en", period="30d", pages=2)
 collect_channel(channel="@some-channel", niche="brain")
 ```
 
-### Важно: что означает «за последние 24 часа»
+### Important: what "in the last 24 hours" means
 
-У всех разделов есть параметр `period_by`:
+Every section has a `period_by` parameter:
 
-- `"published"` (по умолчанию) — **что вышло** в окне. Обычное человеческое чтение.
-- `"discovered"` — **что мы впервые увидели** в окне.
+- `"published"` (default) — **what came out** in the window. The normal
+  human reading.
+- `"discovered"` — **what we first saw** in the window.
 
-Это не педантизм. На скриншотах NexLev в списке «Viral Videos On Small Channels
-— Last 24 hours» лежат ролики с подписью «1 year ago». Значит их окно — про
-попадание в индекс, а не про дату публикации. Оба режима полезны:
-`published` отвечает «что нового вышло», `discovered` — «что нового я нашёл».
-Чтобы воспроизвести поведение NexLev, передавайте `period_by="discovered"`.
+This isn't pedantry. NexLev's own screenshots show videos tagged "1 year
+ago" in a "Viral Videos On Small Channels — Last 24 hours" list — so their
+window is about hitting the index, not the publish date. Both modes are
+useful: `published` answers "what's new that came out", `discovered`
+answers "what's new that I found". To reproduce NexLev's behavior, pass
+`period_by="discovered"`.
 
-**Дальше — смотреть разделы.** Они бесплатны, гоняйте сколько угодно:
+**Next — look at the sections.** They're free, run them as much as you like:
 
 ```
 viral_videos_small_channels(period="24h", max_subscribers=10000, sort_by="viral")
-viral_videos_small_channels(period="24h", period_by="discovered")   # как у NexLev
+viral_videos_small_channels(period="24h", period_by="discovered")   # like NexLev
 recently_added_outlier_channels(period="24h")
 most_popular_categories(period="7d", rank_by="channels")
 trending_keywords(period="24h", sort_by="trend")
 niche_overview(niche="brain")
 ```
 
-**Постоянно — держать воркер включённым.** Через сутки появятся `vph24h` и
-`viewsGained24h`, через неделю — рост каналов и `momentum`, через месяц —
-`calibrate_maturity_curve()` пересчитает кривую под ваши ниши.
+**Ongoing — keep the worker running.** After a day, `vph24h` and
+`viewsGained24h` show up; after a week, channel growth and `momentum`;
+after a month, `calibrate_maturity_curve()` recomputes the curve for your
+niches.
 
-Чтобы темы обновлялись сами, задайте в `.env`:
+To have topics refresh themselves, set in `.env`:
 
 ```
-WORKER_QUERIES=ai automation,faceless history,нейросети для бизнеса
+WORKER_QUERIES=ai automation,faceless history,ai for business
 WORKER_QUERY_PERIOD=24h
 ```
 
-Каждая тема — один поисковый вызов в сутки, так что до ~90 тем безопасно.
+Each topic is one search call a day, so up to ~90 topics is safe.
 
-### Пустой результат объясняет сам себя
+### An empty result explains itself
 
-`viral_videos_small_channels` возвращает `funnel` — сколько видео осталось
-после каждого фильтра — и `hint` с конкретным параметром, который всё отсёк:
+`viral_videos_small_channels` returns a `funnel` — how many videos survived
+each filter — and a `hint` naming exactly which parameter filtered
+everything out:
 
 ```json
 "funnel": [
@@ -326,96 +339,96 @@ WORKER_QUERY_PERIOD=24h
 "hint": null
 ```
 
-Остальные разделы возвращают `hint`, когда результат пуст. В CLI подсказка
-дополнительно печатается отдельной строкой.
+Every other section returns a `hint` when the result is empty. The CLI
+additionally prints the hint as its own line.
 
-**Если раздел вернул пусто** — почти всегда дело не в том, что «ничего не
-трендит», а в том, что в это окно ничего не собрано. `data_coverage(period=…)`
-покажет разницу.
-
----
-
-## Формулы
-
-Полный разбор — в [`../docs/research-tools.md`](../docs/research-tools.md),
-код — в `metrics.py`. Коротко:
-
-```
-outlierScore        = views / медиана просмотров предыдущих 10 long-form загрузок
-outlierScoreAdjusted= views / (baseline * maturity(возраст в днях))
-outlierScoreNexlev  = views / (channel.viewCount // channel.videoCount)   # для сверки с NexLev
-viewsPerSubscriber  = views / подписчики
-viralScore          = прогноз просмотров на 30 дней / подписчики
-vphLifetime         = views / часов с публикации          # это и есть "VPH" в UI NexLev
-vph24h              = (views_сейчас - views_24ч_назад) / 24               # нужна история
-acceleration        = vph24h сегодня / vph24h вчера                       # >1.5 разгоняется
-momentum            = просмотров в день за 30д / просмотров в день за всё время
-revenue             = месячные просмотры / 1000 * RPM ниши * 0.70
-```
-
-Медиана вместо среднего — принципиально: у NexLev baseline это среднее за всю
-жизнь канала, и один вирусный ролик его разрушает (наблюдаемое отношение
-среднего к медиане доходит до 27x).
+**If a section comes back empty**, it's almost never that "nothing is
+trending" — it's that nothing was collected for that window.
+`data_coverage(period=…)` shows the gap.
 
 ---
 
-## Структура
+## Formulas
 
-С 5.09.2026 backend переписан по слоям DDD/Clean Architecture (domain →
-infrastructure → application → interfaces), но **все точки входа остались
-на старых путях**: `server.py`, `api.py`, `cli.py`, `worker.py` в
-`backend/` — это тонкие «шимы» (composition root), которые просто
-импортируют реальный код из нового места. Поэтому `docker compose up`,
-`python cli.py ...`, `uvicorn api:app` и весь Makefile работают
-без изменений. Старые плоские модули (`db.py`, `trends.py`, `query.py` и
-т.д.) сохранены нетронутыми в `backend/_legacy_flat_modules/` — как
-референс/страховка, в коде на них никто больше не ссылается.
+Full details are in `docs/research-tools.md` (internal notes, not included
+in this repository); the code is in `metrics.py`. In short:
+
+```
+outlierScore        = views / median views of the previous 10 long-form uploads
+outlierScoreAdjusted= views / (baseline * maturity(age in days))
+outlierScoreNexlev  = views / (channel.viewCount // channel.videoCount)   # to cross-check against NexLev
+viewsPerSubscriber  = views / subscribers
+viralScore          = 30-day view projection / subscribers
+vphLifetime         = views / hours since publish          # this is what NexLev's UI calls "VPH"
+vph24h              = (views_now - views_24h_ago) / 24               # needs history
+acceleration        = today's vph24h / yesterday's vph24h            # >1.5 = accelerating
+momentum            = views per day over 30d / views per day over lifetime
+revenue             = monthly views / 1000 * niche RPM * 0.70
+```
+
+Median instead of mean is deliberate: NexLev's baseline is the channel's
+lifetime mean, and a single viral video wrecks it (the observed
+mean-to-median ratio runs as high as 27x).
+
+---
+
+## Structure
+
+As of 2026-09-05 the backend has been rewritten in DDD/Clean Architecture
+layers (domain → infrastructure → application → interfaces), but **every
+entry point stayed at its old path**: `server.py`, `api.py`, `cli.py`,
+`worker.py` in `backend/` are thin shims (a composition root) that just
+import the real code from its new home. So `docker compose up`,
+`python cli.py ...`, `uvicorn api:app`, and the whole Makefile work
+unchanged. The old flat modules (`db.py`, `trends.py`, `query.py`, etc.) are
+kept untouched in `backend/_legacy_flat_modules/` as a reference/safety net
+— nothing in the code references them anymore.
 
 ```
 analytic/
-├── docker-compose.yml      воркер + MCP (stdio и HTTP-профиль)
+├── docker-compose.yml      worker + MCP (stdio and HTTP profile)
 ├── Makefile                make up / logs / test / seed / stats / dev
-├── .env.example            ключ и настройки воркера
-├── scripts/mcp-docker.sh   лончер MCP в Docker для Claude Desktop
-├── frontend/               дашборд: index.html, styles.css, ui.js, app.js
-├── docs/
-│   ├── context.md          история решений по проекту
-│   └── research-tools.md   разбор рынка, формулы, что воспроизводимо
+├── .env.example            key and worker settings
+├── scripts/mcp-docker.sh   MCP launcher in Docker for Claude Desktop
+├── frontend/               dashboard: index.html, styles.css, ui.js, app.js
+├── docs/                   internal notes, not included in this repository
+│   ├── context.md          project decision history
+│   └── research-tools.md   market research, formulas, what's reproducible
 └── backend/
     ├── Dockerfile
-    ├── server.py           шим: python server.py -> interfaces.mcp.server
-    ├── cli.py              шим: python cli.py ...  -> interfaces.cli.cli
-    ├── api.py              шим: uvicorn api:app    -> interfaces.http.api
-    ├── worker.py           шим: python worker.py   -> application.worker_cycle
-    ├── migrate_sqlite_to_postgres.py   разовый перенос данных из старого niches.db
+    ├── server.py           shim: python server.py -> interfaces.mcp.server
+    ├── cli.py              shim: python cli.py ...  -> interfaces.cli.cli
+    ├── api.py              shim: uvicorn api:app    -> interfaces.http.api
+    ├── worker.py           shim: python worker.py   -> application.worker_cycle
+    ├── migrate_sqlite_to_postgres.py   one-off migration from the old niches.db
     │
-    ├── domain/             чистые правила, без внешних зависимостей
-    │   ├── metrics.py          все формулы (outlier, VPH, revenue, ...)
-    │   ├── periods.py          разбор 24h / 7d / 30d / all
-    │   ├── keywords.py         n-граммы, momentum, lift
-    │   ├── scoring.py          обратная совместимость (see metrics.py)
-    │   └── categories_catalog.py  чистые категории YouTube + офлайн-фолбэк
+    ├── domain/             pure rules, no external dependencies
+    │   ├── metrics.py          every formula (outlier, VPH, revenue, ...)
+    │   ├── periods.py          parsing 24h / 7d / 30d / all
+    │   ├── keywords.py         n-grams, momentum, lift
+    │   ├── scoring.py          backward compatibility (see metrics.py)
+    │   └── categories_catalog.py  pure YouTube categories + offline fallback
     │
-    ├── infrastructure/     адаптеры к внешнему миру
+    ├── infrastructure/     adapters to the outside world
     │   ├── postgres/           connection.py, schema.py, repositories.py
-    │   │                       (схема Postgres v2, sqlite3-совместимый шим)
-    │   ├── youtube/client.py   обёртка над YouTube Data API v3 + модель квот
-    │   ├── embeddings/fastembed_provider.py  локальные мультиязычные эмбеддинги
-    │   └── categories/repository.py          категории, кэш в Postgres + YouTube API
+    │   │                       (Postgres schema v2, sqlite3-compatible shim)
+    │   ├── youtube/client.py   wrapper around YouTube Data API v3 + quota model
+    │   ├── embeddings/fastembed_provider.py  local multilingual embeddings
+    │   └── categories/repository.py          categories, cached in Postgres + YouTube API
     │
-    ├── application/        оркестрация сценариев (use cases)
-    │   ├── collecting.py       всё, что тратит квоту YouTube (было collector.py)
-    │   ├── discovery.py        три раздела за период (было trends.py)
-    │   ├── channel_tracking.py трекинг и анализ каналов (было tracking.py)
-    │   ├── search.py           outlier-поиск и обзор ниши (было query.py)
-    │   └── worker_cycle.py     цикл фонового сборщика (было worker.py)
+    ├── application/        use-case orchestration
+    │   ├── collecting.py       everything that spends YouTube quota (was collector.py)
+    │   ├── discovery.py        the three period-based sections (was trends.py)
+    │   ├── channel_tracking.py channel tracking and analysis (was tracking.py)
+    │   ├── search.py           outlier search and niche overview (was query.py)
+    │   └── worker_cycle.py     the background collector's loop (was worker.py)
     │
-    ├── interfaces/         тонкие адаптеры наружу
-    │   ├── mcp/server.py       MCP-сервер, 26 инструментов
-    │   ├── http/api.py         HTTP API для дашборда (FastAPI)
-    │   ├── cli/cli.py          то же из терминала + doctor (диагностика)
-    │   └── worker/main.py      точка входа фонового сборщика
+    ├── interfaces/         thin adapters facing outward
+    │   ├── mcp/server.py       MCP server, 26 tools
+    │   ├── http/api.py         HTTP API for the dashboard (FastAPI)
+    │   ├── cli/cli.py          same, from the terminal, plus doctor (diagnostics)
+    │   └── worker/main.py      background collector's entry point
     │
-    ├── _legacy_flat_modules/   старые плоские модули, не импортируются нигде
-    └── tests/              smoke-тесты и синтетический сид
+    ├── _legacy_flat_modules/   old flat modules, not imported anywhere
+    └── tests/              smoke tests and the synthetic seed
 ```
