@@ -1,5 +1,13 @@
 # niche-finder
 
+[![License: MIT](https://img.shields.io/github/license/pandich93/niche-finder?style=flat-square)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square&logo=python&logoColor=white)](backend/Dockerfile)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](backend/interfaces/http/api.py)
+[![PostgreSQL 16](https://img.shields.io/badge/postgres-16-336791?style=flat-square&logo=postgresql&logoColor=white)](docker-compose.yml)
+[![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
+[![MCP](https://img.shields.io/badge/MCP-24%20tools-8A2BE2?style=flat-square)](backend/interfaces/mcp/server.py)
+[![Last commit](https://img.shields.io/github/last-commit/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/commits/main)
+
 Свой аналог NexLev / vidIQ / ViewStats: поиск ниш, вирусных видео у маленьких
 каналов, трендовых категорий и ключевых слов за произвольные периоды (24 часа,
 48 часов, 7/30/90 дней), плюс полноценный трекинг и разбор YouTube-каналов.
@@ -19,13 +27,36 @@
 Обе части и хранилище Postgres запускаются вместе одной командой (см. ниже) —
 дашборд и Claude Desktop в итоге смотрят в одну и ту же базу.
 
+## Возможности
+
+- Поиск вирусных видео и outlier-каналов по нише за произвольный период
+  (24ч / 48ч / 7 / 30 / 90 дней)
+- Трендовые категории и ключевые слова, лучшее время публикации, паттерны
+  заголовков
+- Трекинг конкретных каналов: скорость роста просмотров/подписчиков, история
+  снапшотов
+- Один и тот же расчёт в Claude Desktop (через MCP) и на веб-дашборде —
+  общая кодовая база, не две реализации
+- Только бесплатный YouTube Data API v3 и локальный PostgreSQL — без платных
+  подписок и без LLM-ключа на стороне сервера
+
+## Содержание
+
+- [Как это устроено](#как-это-устроено)
+- [Быстрый старт](#быстрый-старт)
+- [Структура репозитория](#структура-репозитория)
+- [Дальше читать](#дальше-читать)
+
 ## Как это устроено
 
-```
-Claude Desktop      ──▶  MCP-сервер   (backend/server.py) ─┐
-Браузер / frontend  ──▶  HTTP API     (backend/api.py)     ├──▶  PostgreSQL
-YouTube Data API v3 ◀──▶ фоновый воркер (backend/worker.py)─┘
-                          (по расписанию, пишет историю)
+```mermaid
+flowchart LR
+    CD["Claude Desktop"] -->|MCP| MCP["MCP-сервер\nbackend/server.py"]
+    FE["Браузер / frontend"] -->|HTTP| API["HTTP API\nbackend/api.py"]
+    YT["YouTube Data API v3"] <-->|"по расписанию"| W["Фоновый воркер\nbackend/worker.py"]
+    MCP --> PG[("PostgreSQL")]
+    API --> PG
+    W --> PG
 ```
 
 MCP-сервер, HTTP API и воркер — это три разных входа в один и тот же код:
