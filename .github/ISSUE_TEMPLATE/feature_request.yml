@@ -1,0 +1,43 @@
+name: Feature request
+description: A new MCP tool, API endpoint, dashboard screen, or other improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: What are you trying to do that isn't possible (or is
+        awkward) today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you'd like to see — a new tool/endpoint/screen, a
+        new field on an existing one, a config option, etc.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where this fits
+      options:
+        - New MCP tool / HTTP endpoint (collection)
+        - New MCP tool / HTTP endpoint (free section)
+        - Channel tracking / analysis
+        - Dashboard screen
+        - Worker / scheduling
+        - Docs
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workaround you're using today, or other approaches
+        you considered.

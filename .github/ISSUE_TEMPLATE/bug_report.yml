@@ -1,0 +1,62 @@
+name: Bug report
+description: Something isn't working
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please run `docker compose run --rm mcp python cli.py doctor`
+        (or `make doctor`) — it catches most setup issues (missing/invalid key,
+        network, empty database) and its output is worth including below.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands or tool calls, in order.
+      placeholder: |
+        1. docker compose up -d web worker
+        2. make cli ARGS="viral --period 24h"
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: run-mode
+    attributes:
+      label: How are you running it
+      options:
+        - Docker (docker compose)
+        - Without Docker (venv / make local-*)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: e.g. macOS 15, Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor-output
+    attributes:
+      label: "`make doctor` output"
+      description: Paste the full output, if relevant.
+      render: text
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: "`docker compose logs worker` / `web`, or a traceback."
+      render: text
