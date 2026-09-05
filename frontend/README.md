@@ -1,5 +1,10 @@
 # frontend
 
+[![CI](https://img.shields.io/github/actions/workflow/status/pandich93/niche-finder/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/pandich93/niche-finder/actions/workflows/ci.yml)
+[![No build step](https://img.shields.io/badge/build%20step-none-informational?style=flat-square)](index.html)
+[![Vanilla JS](https://img.shields.io/badge/JS-ES%20modules-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](app.js)
+[![License: MIT](https://img.shields.io/github/license/pandich93/niche-finder?style=flat-square)](../LICENSE)
+
 Дашборд к niche-finder — то же, что показывает NexLev у себя в Niche Finder,
 но по вашей локальной базе и без подписки.
 

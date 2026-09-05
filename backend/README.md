@@ -1,4 +1,10 @@
-# niche-finder
+# niche-finder — backend
+
+[![CI](https://img.shields.io/github/actions/workflow/status/pandich93/niche-finder/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/pandich93/niche-finder/actions/workflows/ci.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square&logo=python&logoColor=white)](Dockerfile)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](interfaces/http/api.py)
+[![PostgreSQL 16](https://img.shields.io/badge/postgres-16-336791?style=flat-square&logo=postgresql&logoColor=white)](../docker-compose.yml)
+[![MCP](https://img.shields.io/badge/MCP-24%20tools-8A2BE2?style=flat-square)](interfaces/mcp/server.py)
 
 Свой аналог NexLev / vidIQ / ViewStats: поиск ниш, вирусных видео у маленьких
 каналов, трендовых категорий и ключевых слов **за произвольные периоды**
@@ -10,8 +16,8 @@
 описания и обложки, решение принимается в диалоге. Отдельный платный ключ к
 LLM не нужен.
 
-Разбор рынка, формулы конкурентов и что из них воспроизводимо — в
-[`../docs/research-tools.md`](../docs/research-tools.md).
+Разбор рынка и формулы конкурентов (`docs/research-tools.md`) — внутренние
+заметки, в этот репозиторий не входят.
 
 ---
 
