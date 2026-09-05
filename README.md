@@ -10,6 +10,8 @@
 [![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
 [![MCP](https://img.shields.io/badge/MCP-24%20tools-8A2BE2?style=flat-square)](backend/interfaces/mcp/server.py)
 [![Last commit](https://img.shields.io/github/last-commit/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/commits/main)
+[![Open issues](https://img.shields.io/github/issues/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/issues)
+[![Open PRs](https://img.shields.io/github/issues-pr/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/pulls)
 
 A self-hosted alternative to NexLev / vidIQ / ViewStats: find niches, viral
 videos from small channels, trending categories and keywords over arbitrary
