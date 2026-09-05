@@ -45,10 +45,32 @@
 
 ## Содержание
 
+- [Экраны](#экраны)
 - [Как это устроено](#как-это-устроено)
 - [Быстрый старт](#быстрый-старт)
 - [Структура репозитория](#структура-репозитория)
 - [Дальше читать](#дальше-читать)
+
+## Экраны
+
+<table>
+<tr>
+<td width="50%"><img src="assets/viral.jpg" alt="Вирусные видео у маленьких каналов"><br><sub>Вирусные видео — маленькие каналы, выстрелившие сильнее ожидаемого</sub></td>
+<td width="50%"><img src="assets/outliers.jpg" alt="Outlier-каналы"><br><sub>Outlier-каналы — множитель лучшего видео против медианы канала</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/categories.jpg" alt="Категории"><br><sub>Категории — доля и рост по нишам YouTube</sub></td>
+<td width="50%"><img src="assets/keywords.jpg" alt="Ключевые слова"><br><sub>Ключевые слова — trendScore, lift, momentum</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/tracker.jpg" alt="Трекер каналов"><br><sub>Трекер каналов — сбор и отслеживание конкретных каналов</sub></td>
+<td width="50%"><img src="assets/niches.jpg" alt="Ниши"><br><sub>Ниши — всё, что собрано под пользовательскими ярлыками</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/data.jpg" alt="Данные"><br><sub>Данные — состояние базы и ручной сбор/обновление статистики</sub></td>
+<td width="50%"></td>
+</tr>
+</table>
 
 ## Как это устроено
 
