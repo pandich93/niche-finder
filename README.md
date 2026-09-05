@@ -10,7 +10,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](backend/interfaces/http/api.py)
 [![PostgreSQL 16](https://img.shields.io/badge/postgres-16-336791?style=flat-square&logo=postgresql&logoColor=white)](docker-compose.yml)
 [![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
-[![MCP](https://img.shields.io/badge/MCP-24%20tools-8A2BE2?style=flat-square)](backend/interfaces/mcp/server.py)
+[![MCP](https://img.shields.io/badge/MCP-26%20tools-8A2BE2?style=flat-square)](backend/interfaces/mcp/server.py)
 [![Last commit](https://img.shields.io/github/last-commit/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/commits/main)
 [![Open issues](https://img.shields.io/github/issues/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/issues)
 [![Open PRs](https://img.shields.io/github/issues-pr/pandich93/niche-finder?style=flat-square)](https://github.com/pandich93/niche-finder/pulls)
@@ -26,7 +26,7 @@ topic" is done by the model calling these tools, not the server.
 
 The project has two parts that together make up the "product":
 
-- **`backend/`** — Python: an MCP server (24 tools for Claude), an HTTP API
+- **`backend/`** — Python: an MCP server (26 tools for Claude), an HTTP API
   for the dashboard, and a background worker that logs view/subscriber
   history on a schedule (without this, "growth rate over 24 hours" doesn't
   exist — the YouTube API only ever returns "right now").

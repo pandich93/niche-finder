@@ -63,8 +63,9 @@ tree. In short:
 
 `server.py`, `api.py`, `cli.py`, and `worker.py` at the top of `backend/`
 are shims that just import from `interfaces/` — don't add logic there.
-`backend/_legacy_flat_modules/` is a frozen reference of the pre-DDD code;
-nothing imports it, don't add to it.
+The pre-DDD flat-module code that used to live in `backend/_legacy_flat_modules/`
+has been removed; nothing imported it, so there is nothing to keep in sync
+with `application/`, `domain/`, and `infrastructure/` anymore.
 
 The frontend (`frontend/`) is plain ES modules with no build step and no
 framework — keep it that way. New screens follow the existing pattern in

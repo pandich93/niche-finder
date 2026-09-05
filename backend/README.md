@@ -380,9 +380,9 @@ entry point stayed at its old path**: `server.py`, `api.py`, `cli.py`,
 `worker.py` in `backend/` are thin shims (a composition root) that just
 import the real code from its new home. So `docker compose up`,
 `python cli.py ...`, `uvicorn api:app`, and the whole Makefile work
-unchanged. The old flat modules (`db.py`, `trends.py`, `query.py`, etc.) are
-kept untouched in `backend/_legacy_flat_modules/` as a reference/safety net
-— nothing in the code references them anymore.
+unchanged. The old flat modules (`db.py`, `trends.py`, `query.py`, etc.)
+were kept for a while in `backend/_legacy_flat_modules/` as a reference,
+but nothing in the code referenced them, so that directory has been removed.
 
 ```
 analytic/
@@ -429,6 +429,5 @@ analytic/
     │   ├── cli/cli.py          same, from the terminal, plus doctor (diagnostics)
     │   └── worker/main.py      background collector's entry point
     │
-    ├── _legacy_flat_modules/   old flat modules, not imported anywhere
     └── tests/              smoke tests and the synthetic seed
 ```
