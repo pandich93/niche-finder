@@ -42,3 +42,6 @@ Initial public release.
   container, a `docker compose build` check, and an auto-updated test
   coverage badge.
 - MIT license.
+
+[Unreleased]: https://github.com/pandich93/niche-finder/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/pandich93/niche-finder/releases/tag/v0.1.0
