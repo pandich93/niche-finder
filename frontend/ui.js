@@ -212,6 +212,15 @@ function videoCard(v) {
   </article>`;
 }
 
+function commentList(comments) {
+  if (!comments.length) return empty('нет комментариев');
+  return `<div class="comments-list">${comments.map((c) => `
+    <div class="comment-row">
+      <div class="comment-meta">${esc(c.author || '—')} · ${ago(c.publishedAt)} · 👍 ${num(c.likeCount || 0)}</div>
+      <div class="comment-text">${esc(c.text || '')}</div>
+    </div>`).join('')}</div>`;
+}
+
 function table(cols, rows) {
   if (!rows.length) return empty('нет данных');
   return `<div class="table-wrap"><table>
@@ -261,5 +270,5 @@ function funnelBlock(res) {
 }
 
 export { $, api, q, num, compact, mult, ago, esc, delta, plural, pl, toast, tile, sectionHead,
-         notice, empty, barList, strengthBar, channelRow, videoCard, table,
+         notice, empty, barList, strengthBar, channelRow, videoCard, table, commentList,
          lineChart, funnelBlock, state };

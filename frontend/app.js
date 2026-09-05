@@ -1,7 +1,7 @@
 /* Экраны и роутинг. Компоненты и форматтеры — в ui.js. */
 import {
   $, api, q, num, compact, mult, ago, esc, delta, toast, tile, sectionHead,
-  notice, empty, barList, channelRow, videoCard, table, lineChart, funnelBlock, pl, state,
+  notice, empty, barList, channelRow, videoCard, table, commentList, lineChart, funnelBlock, pl, state,
 } from './ui.js';
 
 const view = $('#view');
@@ -400,10 +400,11 @@ async function viewNiche(slug) {
 /* ----------------------------------------------------------------- Канал */
 
 async function viewChannel(id) {
-  const [a, vel, hist] = await Promise.all([
+  const [a, vel, hist, sim] = await Promise.all([
     api(`/api/channels/${encodeURIComponent(id)}${q({ period: state.period })}`),
     api(`/api/channels/${encodeURIComponent(id)}/velocity${q({ period: state.period })}`),
     api(`/api/channels/${encodeURIComponent(id)}/history`),
+    api(`/api/channels/${encodeURIComponent(id)}/similar`),
   ]);
   view.innerHTML = `
     <div class="card">
@@ -470,7 +471,23 @@ async function viewChannel(id) {
         { label: 'С поправкой на возраст', num: true, render: (r) => mult(r.outlierScoreAgeAdjusted) },
         { label: 'Полоса', render: (r) => esc(r.band) },
         { label: 'Опубликовано', render: (r) => ago(r.publishedAt) },
+        { label: '', render: (r) => `<button class="btn btn-ghost btn-sm js-comments" data-video-id="${esc(r.videoId)}" data-video-title="${esc(r.title)}">комментарии</button>` },
       ], a.topOutliers)}
+    </div>
+
+    <div class="card" id="commentsPanel" hidden></div>
+
+    <div class="card">
+      ${sectionHead('Похожие каналы', 'по эмбеддингам собранных видео -- ' +
+        (sim.videosEmbedded ? `centroid по ${sim.videosEmbedded} видео этого канала` : 'нужны эмбеддинги'))}
+      ${sim.similar.length
+        ? table([
+            { label: 'Канал', wrap: true, render: (r) => `<a href="#/channel/${esc(r.channelId)}">${esc(r.title || r.channelId)}</a>` },
+            { label: 'Подписчиков', num: true, render: (r) => compact(r.subscriberCount) },
+            { label: 'Похожесть', num: true, render: (r) => r.similarity.toFixed(2) },
+            { label: 'Видео с эмбеддингом', num: true, render: (r) => num(r.videosEmbedded) },
+          ], sim.similar)
+        : empty(sim.hint || 'ничего похожего не нашлось в собранном корпусе')}
     </div>
 
     <div class="card">
@@ -492,6 +509,22 @@ async function viewChannel(id) {
       toast('Добавил в трекер', 'ok');
     } catch (e) { toast(e.message, 'err'); }
   });
+
+  view.querySelectorAll('.js-comments').forEach((b) => b.addEventListener('click', async () => {
+    const panel = $('#commentsPanel');
+    panel.hidden = false;
+    panel.innerHTML = sectionHead(`Комментарии: ${esc(b.dataset.videoTitle)}`,
+      'живой запрос к YouTube, тратит 1 unit квоты') + empty('загружаю…');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try {
+      const res = await api(`/api/videos/${encodeURIComponent(b.dataset.videoId)}/comments`,
+        { method: 'POST', body: {} });
+      panel.innerHTML = sectionHead(`Комментарии: ${esc(b.dataset.videoTitle)}`,
+        'живой запрос к YouTube, потратил 1 unit квоты') + commentList(res.comments);
+    } catch (e) {
+      panel.innerHTML = sectionHead(`Комментарии: ${esc(b.dataset.videoTitle)}`, '') + empty(e.message);
+    }
+  }));
 }
 
 

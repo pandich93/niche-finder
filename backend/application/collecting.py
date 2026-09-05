@@ -478,3 +478,36 @@ def video_comments(api_key: str, video_id: str, max_results: int = 100,
         "video_id": video_id, "count": len(comments), "comments": comments,
         "quota": {"units_from_shared_pool": 1, "search_calls": 0},
     }
+
+
+# --------------------------------------------------- backfill_embeddings
+
+def backfill_embeddings(limit: int = 1000, batch_size: int = 256) -> dict:
+    """Compute embeddings for already-collected videos that don't have one yet.
+
+    collect_channel/track_channel default to embed=False (cheap collection),
+    so most of the corpus built that way has embedding IS NULL -- this fills
+    it in from title+description already in Postgres. No YouTube quota spent:
+    it's pure local compute, same text and model as store_videos() uses.
+    """
+    emb = _embeddings()
+    conn = db.get_conn()
+    rows = conn.execute(
+        "SELECT video_id, title, description FROM videos "
+        "WHERE embedding IS NULL ORDER BY published_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    embedded = 0
+    for i in range(0, len(rows), batch_size):
+        chunk = rows[i:i + batch_size]
+        texts = [f"{r['title'] or ''}\n{(r['description'] or '')[:500]}" for r in chunk]
+        vecs = emb.embed(texts)
+        for r, vec in zip(chunk, vecs):
+            conn.execute("UPDATE videos SET embedding=? WHERE video_id=?",
+                        (emb.to_blob(vec), r["video_id"]))
+            embedded += 1
+    conn.commit()
+    remaining = conn.execute(
+        "SELECT COUNT(*) FROM videos WHERE embedding IS NULL").fetchone()[0]
+    conn.close()
+    return {"scanned": len(rows), "embedded": embedded, "remaining_without_embedding": remaining}

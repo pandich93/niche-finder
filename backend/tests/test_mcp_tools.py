@@ -110,6 +110,42 @@ def test_video_comments_tool_shapes_raw_comments(monkeypatch):
     }
 
 
+# --------------------------------------------------- backfill_embeddings
+
+def test_backfill_embeddings_fills_in_missing_vectors():
+    conn = db.get_conn()
+    db.upsert_channel(conn, {
+        "channel_id": "UCbackfill000000000000000", "title": "Backfill Channel",
+        "custom_url": None, "country": None, "description": "", "default_language": None,
+        "subscriber_count": 500, "video_count": 1, "view_count": 500,
+        "thumbnail": None, "published_at": None, "topic_categories": None,
+        "keywords": None, "uploads_playlist": None, "hidden_subs": 0,
+    })
+    db.upsert_video(conn, {
+        "video_id": "vbackfill1", "channel_id": "UCbackfill000000000000000",
+        "title": "unembedded video", "description": "needs a vector",
+        "published_at": "2026-01-01T00:00:00Z", "duration_seconds": 300,
+        "view_count": 10, "like_count": 1, "comment_count": 0, "thumbnail": None,
+        "tags": "[]", "default_language": "en", "embedding": None,
+        "updated_at": "2026-01-01T00:00:00Z", "category_id": None, "region": None,
+        "is_short": 0, "topic_categories": None, "live_content": None,
+    })
+    conn.commit()
+    before = conn.execute(
+        "SELECT embedding FROM videos WHERE video_id='vbackfill1'").fetchone()
+    assert before["embedding"] is None
+    conn.close()
+
+    out = srv.backfill_embeddings(limit=10000)
+    assert out["embedded"] >= 1
+
+    conn = db.get_conn()
+    after = conn.execute(
+        "SELECT embedding FROM videos WHERE video_id='vbackfill1'").fetchone()
+    conn.close()
+    assert after["embedding"] is not None
+
+
 # --------------------------------------------------- similar_channels
 
 def test_similar_channels_without_embeddings_gives_a_hint():

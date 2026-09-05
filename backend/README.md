@@ -5,7 +5,7 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square&logo=python&logoColor=white)](Dockerfile)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](interfaces/http/api.py)
 [![PostgreSQL 16](https://img.shields.io/badge/postgres-16-336791?style=flat-square&logo=postgresql&logoColor=white)](../docker-compose.yml)
-[![MCP](https://img.shields.io/badge/MCP-28%20tools-8A2BE2?style=flat-square)](interfaces/mcp/server.py)
+[![MCP](https://img.shields.io/badge/MCP-29%20tools-8A2BE2?style=flat-square)](interfaces/mcp/server.py)
 
 A self-hosted alternative to NexLev / vidIQ / ViewStats: find niches, viral
 videos from small channels, trending categories and keywords **over
@@ -157,6 +157,7 @@ quota, an empty database, no history. One check costs 1 quota unit.
 make cli ARGS="collect-channel @somechannel"      # build up the corpus, cheap
 make cli ARGS="collect 'ai automation' --period 24h"
 make cli ARGS="refresh"                           # refresh counters → history
+make cli ARGS="embed-videos"                      # backfill embeddings, 0 quota
 make cli ARGS="viral --period 24h"
 make cli ARGS="viral --period 24h --period-by discovered"
 make cli ARGS="categories --period 7d --rank-by channels"
@@ -424,7 +425,7 @@ analytic/
     │   └── worker_cycle.py     the background collector's loop (was worker.py)
     │
     ├── interfaces/         thin adapters facing outward
-    │   ├── mcp/server.py       MCP server, 28 tools
+    │   ├── mcp/server.py       MCP server, 29 tools
     │   ├── http/api.py         HTTP API for the dashboard (FastAPI)
     │   ├── cli/cli.py          same, from the terminal, plus doctor (diagnostics)
     │   └── worker/main.py      background collector's entry point

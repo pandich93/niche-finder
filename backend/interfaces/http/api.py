@@ -209,6 +209,11 @@ def channel_history(channel_id: str, limit: int = 400):
     return T.channel_history(channel_id, limit=limit)
 
 
+@app.get("/api/channels/{channel_id}/similar")
+def similar_channels(channel_id: str, niche: str = None, limit: int = 10):
+    return Q.similar_channels(channel_id, niche=niche, limit=limit)
+
+
 @app.get("/api/title-changes")
 def title_changes(period: str = "7d", channel_id: str = None, limit: int = 50):
     return T.title_changes(period=period, channel_id=channel_id, limit=limit)
@@ -270,6 +275,14 @@ def refresh(payload: dict = Body(default={})):
                                         limit=int(payload.get("limit", 1000)))
     chan_res = collector.refresh_channels(API_KEY, only_tracked=True)
     return {"videos": stats_res, "channels": chan_res}
+
+
+@app.post("/api/videos/{video_id}/comments")
+def video_comments(video_id: str, payload: dict = Body(default={})):
+    _need_key()
+    return collector.video_comments(
+        API_KEY, video_id, max_results=int(payload.get("max_results", 100)),
+        order=payload.get("order", "relevance"))
 
 
 @app.post("/api/channels/track")

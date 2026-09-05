@@ -134,6 +134,19 @@ def refresh_categories(regions: list = None, hl: str = "en_US") -> dict:
 
 
 @mcp.tool()
+def backfill_embeddings(limit: int = 1000) -> dict:
+    """Compute embeddings for already-collected videos that don't have one yet.
+    0 YouTube quota -- pure local compute over title/description already in
+    Postgres, no API key needed.
+
+    collect_channel/track_channel default to embed=False (cheap collection),
+    so most of the corpus lacks embeddings until this runs. Needed before
+    similar_channels or search_outliers(query=...) can see a given channel.
+    """
+    return collector.backfill_embeddings(limit=limit)
+
+
+@mcp.tool()
 def video_comments(video_id: str, max_results: int = 100, order: str = "relevance",
                    search_terms: str = None) -> dict:
     """Top-level comments for one video, live from the API. 1 unit, not stored

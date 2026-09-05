@@ -5,6 +5,7 @@
     python cli.py collect-channel @handle     собрать канал (дёшево)
     python cli.py collect "ai automation" --period 24h
     python cli.py refresh                     обновить счётчики (история)
+    python cli.py embed-videos                досчитать эмбеддинги (0 quota)
     python cli.py viral --period 24h
     python cli.py categories --period 7d --rank-by channels
     python cli.py keywords --period 24h
@@ -176,6 +177,11 @@ def cmd_stats(args):
     out(query.db_stats())
 
 
+def cmd_embed_videos(args):
+    from application import collecting as collector
+    out(collector.backfill_embeddings(limit=args.limit))
+
+
 def cmd_seed(args):
     # cli.py now lives at backend/interfaces/cli/ (two levels deeper than the
     # old flat backend/cli.py), so climb back up to backend/ before reaching
@@ -194,6 +200,10 @@ def main():
     sub.add_parser("doctor", help="проверить ключ, сеть, базу").set_defaults(fn=cmd_doctor)
     sub.add_parser("stats", help="что в базе").set_defaults(fn=cmd_stats)
     sub.add_parser("seed", help="залить синтетические данные").set_defaults(fn=cmd_seed)
+
+    p = sub.add_parser("embed-videos", help="досчитать эмбеддинги для уже собранных видео (0 quota)")
+    p.add_argument("--limit", type=int, default=1000)
+    p.set_defaults(fn=cmd_embed_videos)
 
     p = sub.add_parser("collect-channel", help="собрать канал (1 unit / 50 видео)")
     p.add_argument("channel")
