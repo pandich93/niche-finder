@@ -82,30 +82,30 @@ Claude Desktop connection — in
 {
   "mcpServers": {
     "niche-finder": {
-      "command": "/path/to/niche-finder/scripts/mcp-docker.sh"
-    }
-  }
-}
-```
-
-The script fills in `--env-file` itself and mounts the same volumes as the
-worker, so the tools immediately see everything already collected. Without
-the script:
-
-```json
-{
-  "mcpServers": {
-    "niche-finder": {
-      "command": "docker",
+      "command": "/usr/local/bin/docker",
       "args": ["run", "--rm", "-i",
                "--network", "niche-finder_default",
                "--env-file", "/path/to/niche-finder/.env",
+               "-e", "POSTGRES_HOST=postgres",
                "-v", "niche-finder-models:/models",
                "niche-finder:latest", "python", "server.py"]
     }
   }
 }
 ```
+
+Use the absolute path to `docker` (`which docker`), not just `"docker"` —
+Claude Desktop's MCP launcher doesn't always inherit your shell's `PATH`.
+
+There's also a `scripts/mcp-docker.sh` launcher that fills in `--env-file`
+and the volumes for you, so you can point `command` at it directly instead
+of writing out the full `docker run` line. **On macOS it can fail with
+`Operation not permitted` / `Server disconnected`**, even though the same
+script runs fine from a terminal — Claude Desktop's MCP process appears to
+be sandboxed and unable to exec an arbitrary script it didn't create,
+regardless of the script's file permissions. If you hit that, use the raw
+`docker` command above instead (it invokes the already-trusted `docker`
+binary directly, so the sandbox restriction doesn't apply).
 
 ### If the build fails at Docker Hub
 
