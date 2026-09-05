@@ -21,6 +21,7 @@ ENV_ARG=""
 exec docker run --rm -i \
   --network niche-finder_default \
   $ENV_ARG \
+  -e POSTGRES_HOST=postgres \
   -v "$DIR/backend:/app:ro" \
   -v niche-finder-models:/models \
   niche-finder:latest python server.py
