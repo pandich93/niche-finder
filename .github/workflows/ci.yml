@@ -42,7 +42,12 @@ jobs:
         run: |
           coverage run --source=. --omit="tests/*,_legacy_flat_modules/*" tests/test_smoke.py
           coverage report -m
-          coverage json -o ../assets/coverage.json
+          coverage json -o /tmp/coverage_full.json
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/coverage_full.json'))
+          json.dump({'totals': d['totals']}, open('../assets/coverage.json', 'w'), indent=2)
+          "
 
       - name: Commit coverage badge data
         if: github.event_name == 'push'
