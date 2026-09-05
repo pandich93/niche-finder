@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 
 import infrastructure.postgres as db
 from application import collecting as collector
+from domain import periods as P
 import infrastructure.youtube.client as yt
 
 load_env = None
@@ -63,18 +64,22 @@ def log(msg):
 
 def _get_meta(key):
     conn = db.get_conn()
-    row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+    value = db.get_meta(conn, key)
     conn.close()
-    return row["value"] if row else None
+    return value
 
 
 def _set_meta(key, value):
     conn = db.get_conn()
-    conn.execute(
-        "INSERT INTO meta (key, value) VALUES (?,?) "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, str(value)))
+    db.set_meta(conn, key, value)
     conn.commit()
     conn.close()
+
+
+def _search_quota_blocked_today() -> bool:
+    """True if a search.list call already hit QuotaExceeded today (Pacific Time) --
+    no point retrying WORKER_QUERIES again before the bucket resets."""
+    return _get_meta("worker_quota_blocked_until") == P.pacific_date_key()
 
 
 def _due(key, interval_min):
@@ -101,8 +106,7 @@ def _safe(name, fn):
         return result
     except yt.QuotaExceeded as e:
         log(f"{name}: QUOTA EXCEEDED -- backing off until tomorrow ({e})")
-        _set_meta("worker_quota_blocked_until",
-                  datetime.now(timezone.utc).isoformat())
+        _set_meta("worker_quota_blocked_until", P.pacific_date_key())
         return None
     except Exception:
         log(f"{name}: FAILED\n{traceback.format_exc()}")
@@ -123,9 +127,13 @@ def cycle():
         if DO_TRENDING:
             _safe("trending charts", lambda: collector.collect_trending(
                 API_KEY, regions=tuple(REGIONS), category_ids=(None,), pages=2))
-        for query in QUERIES:
-            _safe(f"collect '{query}'", lambda query=query: collector.collect_niche(
-                API_KEY, query, period=QUERY_PERIOD, pages=QUERY_PAGES, embed=True))
+        if QUERIES and _search_quota_blocked_today():
+            log("collect queries: skipped, search.list quota already exhausted "
+                "today (resets at midnight Pacific Time)")
+        else:
+            for query in QUERIES:
+                _safe(f"collect '{query}'", lambda query=query: collector.collect_niche(
+                    API_KEY, query, period=QUERY_PERIOD, pages=QUERY_PAGES, embed=True))
         _mark("daily")
 
 

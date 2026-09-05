@@ -16,6 +16,8 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 import infrastructure.postgres as db
+import infrastructure.youtube.client as yt
+from application import collecting as collector
 from domain import metrics as M
 from domain import periods as P
 from domain import keywords as K
@@ -527,7 +529,17 @@ def coverage(period="7d") -> dict:
         "SELECT MIN(captured_at) FROM video_stats_history").fetchone()[0]
     tracked = conn.execute(
         "SELECT COUNT(*) FROM tracked_channels WHERE active=1").fetchone()[0]
+    calls_today = collector.search_calls_today(conn)
+    calls_left = max(0, yt.SEARCH_DAILY_CALL_LIMIT - calls_today)
     conn.close()
+    hint = ("Run collect_niche / collect_trending to fill the corpus, and keep "
+            "the worker running (or call refresh_stats) so vph24h and "
+            "viewsGained24h stop being null.")
+    if calls_left == 0:
+        hint = ("The 100-calls/day search.list bucket is exhausted for today "
+                "(resets at midnight Pacific Time) -- collect_channel and "
+                "refresh_stats still work, but collect_niche will fail until "
+                "then.")
     return {
         "period": period,
         "videosTotal": total,
@@ -538,7 +550,7 @@ def coverage(period="7d") -> dict:
         "historyStartedAt": oldest,
         "trackedChannels": tracked,
         "velocityMetricsAvailable": bool(oldest),
-        "hint": ("Run collect_niche / collect_trending to fill the corpus, and keep "
-                 "the worker running (or call refresh_stats) so vph24h and "
-                 "viewsGained24h stop being null."),
+        "searchCallsToday": calls_today,
+        "searchCallsLeftToday": calls_left,
+        "hint": hint,
     }

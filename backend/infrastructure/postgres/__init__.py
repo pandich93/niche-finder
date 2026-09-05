@@ -40,4 +40,6 @@ from infrastructure.postgres.repositories import (  # noqa: F401
     new_chart_snapshot,
     add_chart_entry,
     upsert_category,
+    get_meta,
+    set_meta,
 )

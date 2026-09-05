@@ -40,7 +40,8 @@ jobs:
       - name: Run smoke tests with coverage
         working-directory: backend
         run: |
-          coverage run --source=. --omit="tests/*,_legacy_flat_modules/*" tests/test_smoke.py
+          coverage run --source=. --omit="tests/*" tests/test_smoke.py
+          coverage run -a --source=. --omit="tests/*" tests/test_mcp_tools.py
           coverage report -m
           coverage json -o /tmp/coverage_full.json
           python3 -c "

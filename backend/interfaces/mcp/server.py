@@ -133,6 +133,23 @@ def refresh_categories(regions: list = None, hl: str = "en_US") -> dict:
     return C.refresh_categories(API_KEY, regions=tuple(regions or ["US"]), hl=hl)
 
 
+@mcp.tool()
+def video_comments(video_id: str, max_results: int = 100, order: str = "relevance",
+                   search_terms: str = None) -> dict:
+    """Top-level comments for one video, live from the API. 1 unit, not stored
+    locally.
+
+    A competitive signal nothing else here surfaces: what viewers actually
+    praise, complain about or ask for. Returns raw author/text/likeCount --
+    judging tone or extracting themes is left to whichever Claude session
+    calls this, same as everywhere else in this server.
+    order: relevance | time. search_terms filters to comments containing a phrase.
+    """
+    _require_key()
+    return collector.video_comments(API_KEY, video_id, max_results=max_results,
+                                    order=order, search_terms=search_terms)
+
+
 # ============================================================ DISCOVER
 
 @mcp.tool()
@@ -298,6 +315,21 @@ def niche_overview(niche: str, period: str = "all") -> dict:
     distribution, median outlier, viral skew, Shorts share, top categories and
     how many small channels are breaking out."""
     return q.niche_overview(niche, period=period)
+
+
+@mcp.tool()
+def similar_channels(channel_id: str, niche: str = None, limit: int = 10,
+                     min_videos_embedded: int = 1) -> dict:
+    """Channels whose collected content reads as semantically closest to this
+    one. FREE, no quota, searches only what is already in the local DB.
+
+    Needs both this channel and the candidates to have embedded videos --
+    collect_channel/track_channel default to embed=False (cheap collection),
+    so re-run those with embed=True, or use collect_niche, first. Optionally
+    scope the comparison pool with `niche` instead of the whole corpus.
+    """
+    return q.similar_channels(channel_id, niche=niche, limit=limit,
+                              min_videos_embedded=min_videos_embedded)
 
 
 @mcp.tool()

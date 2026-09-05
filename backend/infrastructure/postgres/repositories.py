@@ -157,6 +157,17 @@ def add_chart_entry(conn, snapshot_id: int, video_id: str, rank: int, view_count
     )
 
 
+def get_meta(conn, key: str):
+    row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_meta(conn, key: str, value):
+    conn.execute(
+        "INSERT INTO meta (key, value) VALUES (?,?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, str(value)))
+
+
 def upsert_category(conn, category_id, region, title, assignable):
     conn.execute(
         "INSERT INTO video_categories (category_id, region, title, assignable, updated_at) "

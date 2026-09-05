@@ -196,12 +196,15 @@ def collect_niche(api_key: str, query: str, label: str = None, language: str = N
         if not token:
             break
 
+    calls_today = _record_search_calls(conn, search_calls)
+
     video_ids = list(dict.fromkeys(video_ids))
     if not video_ids:
         conn.commit()
         conn.close()
         return {"niche": slug, "query": query, "videos_found": 0,
-                "quota": _quota(search_calls, 0, 0), "min_upload_date": min_upload_date}
+                "quota": _quota(search_calls, 0, 0, calls_today=calls_today),
+                "min_upload_date": min_upload_date}
 
     video_items = yt.videos_list(api_key, video_ids)
     channel_ids = list({(v.get("snippet") or {}).get("channelId")
@@ -217,18 +220,39 @@ def collect_niche(api_key: str, query: str, label: str = None, language: str = N
         "niche": slug, "query": query, "min_upload_date": min_upload_date,
         "videos_found": len(video_ids), "videos_stored": stored,
         "channels_stored": len(channel_items),
-        "quota": _quota(search_calls, len(video_ids), len(channel_ids)),
+        "quota": _quota(search_calls, len(video_ids), len(channel_ids), calls_today=calls_today),
     }
 
 
-def _quota(search_calls, n_videos, n_channels, playlist_calls=0, other=0):
+def _record_search_calls(conn, n: int) -> int:
+    """Persist search.list calls against today's Pacific-Time quota day (that is
+    when Google actually resets the 100-calls/day bucket) and return the new
+    running total for the day."""
+    if n <= 0:
+        return search_calls_today(conn)
+    key = f"search_calls_{P.pacific_date_key()}"
+    total = int(db.get_meta(conn, key) or 0) + n
+    db.set_meta(conn, key, total)
+    return total
+
+
+def search_calls_today(conn) -> int:
+    """How many search.list calls have already been spent today (Pacific Time)."""
+    key = f"search_calls_{P.pacific_date_key()}"
+    return int(db.get_meta(conn, key) or 0)
+
+
+def _quota(search_calls, n_videos, n_channels, playlist_calls=0, other=0, calls_today=None):
     units = (n_videos + 49) // 50 + (n_channels + 49) // 50 + playlist_calls + other
+    calls_today = search_calls if calls_today is None else calls_today
     return {
         "search_calls": search_calls,
-        "search_calls_left_today": max(0, yt.SEARCH_DAILY_CALL_LIMIT - search_calls),
+        "search_calls_today": calls_today,
+        "search_calls_left_today": max(0, yt.SEARCH_DAILY_CALL_LIMIT - calls_today),
         "units_from_shared_pool": units + search_calls,
-        "note": "search.list has its own 100-calls/day bucket since 1 June 2026; "
-                "everything else shares 10,000 units/day",
+        "note": "search.list has its own 100-calls/day bucket since 1 June 2026, "
+                "resetting at midnight Pacific Time; everything else shares "
+                "10,000 units/day",
     }
 
 
@@ -427,3 +451,30 @@ def refresh_channels(api_key: str, channel_ids=None, only_tracked=True) -> dict:
     conn.close()
     return {"refreshed": len(items),
             "quota": {"units_from_shared_pool": (len(ids) + 49) // 50, "search_calls": 0}}
+
+
+# --------------------------------------------------------- video_comments
+
+def video_comments(api_key: str, video_id: str, max_results: int = 100,
+                   order: str = "relevance", search_terms: str = None) -> dict:
+    """Top-level comments for one video, live from the API. 1 unit, not stored
+    locally -- a competitive signal (complaints, requests, reactions) that
+    nothing else in this server surfaces. Returns raw text for the calling
+    model to read; the server does not run any sentiment/classification
+    itself, same as everywhere else in this project."""
+    items = yt.comment_threads(api_key, video_id, max_results=max_results,
+                               order=order, search_terms=search_terms)
+    comments = []
+    for it in items:
+        top = ((it.get("snippet") or {}).get("topLevelComment") or {}).get("snippet") or {}
+        comments.append({
+            "author": top.get("authorDisplayName"),
+            "text": top.get("textDisplay"),
+            "likeCount": top.get("likeCount"),
+            "publishedAt": top.get("publishedAt"),
+            "replyCount": (it.get("snippet") or {}).get("totalReplyCount"),
+        })
+    return {
+        "video_id": video_id, "count": len(comments), "comments": comments,
+        "quota": {"units_from_shared_pool": 1, "search_calls": 0},
+    }

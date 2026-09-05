@@ -1,6 +1,9 @@
 """Time-window parsing shared by every 'за последние 24 часа / 7 дней' feature."""
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import re
+
+_PACIFIC = ZoneInfo("America/Los_Angeles")
 
 _RE = re.compile(r"^\s*(\d+)\s*([hdwm])\s*$", re.IGNORECASE)
 
@@ -84,3 +87,10 @@ def days_since(iso_ts: str, ref: datetime = None) -> float:
 def to_rfc3339(dt: datetime) -> str:
     """YouTube API wants 1970-01-01T00:00:00Z style."""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def pacific_date_key(ref: datetime = None) -> str:
+    """YYYY-MM-DD in America/Los_Angeles -- YouTube/Google API daily quotas
+    (e.g. search.list's 100-calls/day bucket) reset at midnight Pacific,
+    not UTC."""
+    return (ref or now()).astimezone(_PACIFIC).strftime("%Y-%m-%d")

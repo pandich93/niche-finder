@@ -8,7 +8,9 @@ from our own snapshots, and NexLev's own score for comparison.
 import statistics as st
 
 import infrastructure.postgres as db
+import infrastructure.youtube.client as yt
 from domain import metrics as M
+from application import collecting
 from application import discovery as trends
 from infrastructure.categories import repository as C
 
@@ -149,6 +151,8 @@ def db_stats() -> dict:
     conn = db.get_conn()
     def one(sql):
         return conn.execute(sql).fetchone()[0]
+    calls_today = collecting.search_calls_today(conn)
+    blocked_until = db.get_meta(conn, "worker_quota_blocked_until")
     out = {
         "channels": one("SELECT COUNT(*) FROM channels"),
         "videos": one("SELECT COUNT(*) FROM videos"),
@@ -162,6 +166,79 @@ def db_stats() -> dict:
         "newest_video": one("SELECT MAX(published_at) FROM videos"),
         "history_since": one("SELECT MIN(captured_at) FROM video_stats_history"),
         "db_path": db.display_dsn(),
+        "search_quota": {
+            "search_calls_today": calls_today,
+            "search_calls_left_today": max(0, yt.SEARCH_DAILY_CALL_LIMIT - calls_today),
+            "resets_at": "midnight Pacific Time",
+        },
+        "worker_quota_blocked_until": blocked_until,
     }
     conn.close()
     return out
+
+
+def similar_channels(channel_id: str, niche: str = None, limit: int = 10,
+                     min_videos_embedded: int = 1) -> dict:
+    """Channels whose collected videos read as semantically closest to this
+    one, via the same title+description embeddings search_outliers uses.
+
+    Each channel's vector is the mean of its stored per-video embeddings, so
+    it only works for channels that actually have embedded videos.
+    collect_channel/track_channel default to embed=False (cheap collection);
+    pass embed=True there, or use collect_niche, to make a channel eligible.
+    niche optionally limits the comparison pool to one collected niche
+    instead of the whole corpus.
+    """
+    import infrastructure.embeddings.fastembed_provider as emb
+
+    conn = db.get_conn()
+    target_rows = conn.execute(
+        "SELECT embedding FROM videos WHERE channel_id=? AND embedding IS NOT NULL",
+        (channel_id,)).fetchall()
+    if not target_rows:
+        conn.close()
+        return {
+            "channel_id": channel_id, "similar": [],
+            "hint": ("no embedded videos for this channel -- collect_channel/"
+                     "track_channel default to embed=False; re-run with "
+                     "embed=True, or via collect_niche, to populate embeddings"),
+        }
+    target = sum(emb.from_blob(r["embedding"]) for r in target_rows) / len(target_rows)
+
+    if niche:
+        sql = ("SELECT v.channel_id, v.embedding FROM videos v "
+               "JOIN video_niches vn ON vn.video_id = v.video_id "
+               "WHERE vn.niche_slug=? AND v.embedding IS NOT NULL AND v.channel_id != ?")
+        params = (niche, channel_id)
+    else:
+        sql = ("SELECT channel_id, embedding FROM videos "
+               "WHERE embedding IS NOT NULL AND channel_id != ?")
+        params = (channel_id,)
+    rows = conn.execute(sql, params).fetchall()
+
+    by_channel = {}
+    for r in rows:
+        by_channel.setdefault(r["channel_id"], []).append(emb.from_blob(r["embedding"]))
+
+    scored = []
+    for cid, vecs in by_channel.items():
+        if len(vecs) < min_videos_embedded:
+            continue
+        centroid = sum(vecs) / len(vecs)
+        scored.append((cid, emb.cosine(target, centroid), len(vecs)))
+    scored.sort(key=lambda t: t[1], reverse=True)
+
+    out = []
+    for cid, score, n in scored[:limit]:
+        ch = conn.execute(
+            "SELECT title, subscriber_count, thumbnail FROM channels WHERE channel_id=?",
+            (cid,)).fetchone()
+        out.append({
+            "channelId": cid, "title": ch["title"] if ch else None,
+            "subscriberCount": ch["subscriber_count"] if ch else None,
+            "thumbnail": ch["thumbnail"] if ch else None,
+            "similarity": round(score, 4), "videosEmbedded": n,
+        })
+    conn.close()
+    return {"channel_id": channel_id, "videosEmbedded": len(target_rows),
+            "candidatesConsidered": len(by_channel), "similar": out}
