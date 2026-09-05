@@ -8,6 +8,8 @@ on:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     services:
       postgres:
         image: postgres:16-alpine
@@ -33,11 +35,25 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements.txt coverage
 
-      - name: Run smoke tests
+      - name: Run smoke tests with coverage
         working-directory: backend
-        run: python tests/test_smoke.py
+        run: |
+          coverage run --source=. --omit="tests/*,_legacy_flat_modules/*" tests/test_smoke.py
+          coverage report -m
+          coverage json -o ../assets/coverage.json
+
+      - name: Commit coverage badge data
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/coverage.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update coverage badge data [skip ci]"
+            git push
+          fi
 
   docker-build:
     runs-on: ubuntu-latest

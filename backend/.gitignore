@@ -5,3 +5,4 @@ __pycache__/
 niches.db
 niches.db-journal
 _to_delete/
+.coverage
