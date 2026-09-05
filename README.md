@@ -49,6 +49,8 @@ database.
 - [How it works](#how-it-works)
 - [Quick start](#quick-start)
 - [Repository layout](#repository-layout)
+- [Contributing](#contributing)
+- [Changelog](#changelog)
 - [Read next](#read-next)
 
 ## Screens
@@ -128,6 +130,19 @@ make local-run                # or: MCP server on the host, for Claude Desktop
 
 `docs/` (decision history and market research) — internal notes, not
 included in this repository.
+
+## Contributing
+
+Bug reports, bug fixes, and documentation PRs are welcome — for anything
+bigger (a new MCP tool, API endpoint, or dashboard screen), please open an
+issue first to agree on the shape. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for how to set up a dev environment and
+run the test suite.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a history of notable changes, in
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 ## Read next
 
