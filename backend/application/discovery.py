@@ -331,6 +331,7 @@ def _video_out(r):
         "isShort": r["isShort"],
         "thumbnail": r["thumbnail"],
         "category": r["category"],
+        "estimatedRpm": M.rpm_effective(C.rpm_niche(r["category_id"])),
         "language": r["default_language"],
         "channelId": r["channel_id"],
         "channelTitle": r["channel_title"],

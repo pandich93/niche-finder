@@ -305,21 +305,30 @@ def search_outliers(query: str = None, niche: str = None, languages: list = None
                     max_subscribers: int = None, max_channel_video_count: int = None,
                     min_upload_date: str = None, min_outlier_score: float = 3.0,
                     period: str = "all", region: str = None, category_id: str = None,
-                    exclude_shorts: bool = False, sort_by: str = "outlier",
-                    limit: int = 25) -> list:
+                    exclude_shorts: bool = False, only_shorts: bool = False,
+                    min_video_length: int = None, max_video_length: int = None,
+                    min_rpm: float = None, max_rpm: float = None,
+                    sort_by: str = "outlier", limit: int = 25) -> list:
     """Search the local database for outlier videos. FREE, no quota, unlimited.
 
     Pass `query` for semantic ranking against local multilingual embeddings.
     outlierScore here is against the channel's own rolling median (the
     ViewStats/1of10 definition); outlierScoreNexlev is NexLev's lifetime-mean
     version, kept so numbers stay comparable with their UI.
+
+    min_rpm/max_rpm filter on estimatedRpm, a NexLev-style RPM estimate
+    derived from the video's category via the same static niche-RPM table
+    channel revenue estimates use (domain/metrics.py NICHE_RPM) -- an
+    approximation, not a measured payout. min_video_length/max_video_length
+    are in seconds.
     """
     return q.search_outliers(
         query=query, niche=niche, languages=languages, max_subscribers=max_subscribers,
         max_channel_video_count=max_channel_video_count, min_upload_date=min_upload_date,
         min_outlier_score=min_outlier_score, period=period, region=region,
-        category_id=category_id, exclude_shorts=exclude_shorts, sort_by=sort_by,
-        limit=limit)
+        category_id=category_id, exclude_shorts=exclude_shorts, only_shorts=only_shorts,
+        min_video_length=min_video_length, max_video_length=max_video_length,
+        min_rpm=min_rpm, max_rpm=max_rpm, sort_by=sort_by, limit=limit)
 
 
 @mcp.tool()

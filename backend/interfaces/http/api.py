@@ -156,10 +156,16 @@ def competition(period: str = "30d", niche: str = None, limit: int = 15):
 @app.get("/api/search")
 def search(query: str = None, niche: str = None, period: str = "all",
            min_outlier_score: float = 0.0, max_subscribers: int = None,
+           exclude_shorts: bool = False, only_shorts: bool = False,
+           min_video_length: int = None, max_video_length: int = None,
+           min_rpm: float = None, max_rpm: float = None,
            sort_by: str = "outlier", limit: int = 30):
     return {"results": Q.search_outliers(
         query=query or None, niche=niche, period=period,
         min_outlier_score=min_outlier_score, max_subscribers=max_subscribers,
+        exclude_shorts=exclude_shorts, only_shorts=only_shorts,
+        min_video_length=min_video_length, max_video_length=max_video_length,
+        min_rpm=min_rpm, max_rpm=max_rpm,
         sort_by=sort_by, limit=limit)}
 
 

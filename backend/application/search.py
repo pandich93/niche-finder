@@ -19,12 +19,14 @@ def search_outliers(query: str = None, niche: str = None, languages: list = None
                     max_subscribers: int = None, max_channel_video_count: int = None,
                     min_upload_date: str = None, min_outlier_score: float = 0.0,
                     period: str = "all", region: str = None, category_id: str = None,
-                    exclude_shorts: bool = False, sort_by: str = "outlier",
-                    limit: int = 25) -> list:
+                    exclude_shorts: bool = False, only_shorts: bool = False,
+                    min_video_length: int = None, max_video_length: int = None,
+                    min_rpm: float = None, max_rpm: float = None,
+                    sort_by: str = "outlier", limit: int = 25) -> list:
     rows = trends.load_window(
         period=period, niche=niche, languages=languages, region=region,
         category_id=category_id, max_subscribers=max_subscribers,
-        exclude_shorts=exclude_shorts,
+        exclude_shorts=exclude_shorts, only_shorts=only_shorts,
     )
     if min_upload_date:
         rows = [r for r in rows if (r["published_at"] or "") >= min_upload_date]
@@ -33,6 +35,17 @@ def search_outliers(query: str = None, niche: str = None, languages: list = None
     if min_outlier_score:
         rows = [r for r in rows
                 if (r["outlierScore"] or r["outlierScoreNexlev"] or 0) >= min_outlier_score]
+    if min_video_length is not None:
+        rows = [r for r in rows if (r["duration_seconds"] or 0) >= min_video_length]
+    if max_video_length is not None:
+        rows = [r for r in rows if (r["duration_seconds"] or 0) <= max_video_length]
+    if min_rpm is not None or max_rpm is not None:
+        for r in rows:
+            r["_rpm"] = M.rpm_effective(C.rpm_niche(r["category_id"]))
+        if min_rpm is not None:
+            rows = [r for r in rows if r["_rpm"] >= min_rpm]
+        if max_rpm is not None:
+            rows = [r for r in rows if r["_rpm"] <= max_rpm]
 
     q_vec = None
     if query:

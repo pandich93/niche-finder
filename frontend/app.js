@@ -103,12 +103,18 @@ const FIND_SORTS = [
 
 async function viewFind() {
   const p = Object.assign(
-    { query: '', min_outlier_score: 0, max_subscribers: '', sort_by: 'outlier' },
+    { query: '', min_outlier_score: 0, max_subscribers: '', sort_by: 'outlier',
+      min_rpm: '', max_rpm: '', min_length_min: '', max_length_min: '', shorts: 'any' },
     JSON.parse(localStorage.getItem('nf.find') || '{}'));
   const d = await api(`/api/search${q({
     ...base(), query: p.query || null,
     min_outlier_score: p.min_outlier_score || null,
     max_subscribers: p.max_subscribers || null,
+    min_rpm: p.min_rpm || null, max_rpm: p.max_rpm || null,
+    min_video_length: p.min_length_min ? p.min_length_min * 60 : null,
+    max_video_length: p.max_length_min ? p.max_length_min * 60 : null,
+    exclude_shorts: p.shorts === 'exclude' || null,
+    only_shorts: p.shorts === 'only' || null,
     sort_by: p.sort_by, limit: 30,
   })}`);
 
@@ -126,11 +132,30 @@ async function viewFind() {
           <select id="fFindSort">
             ${FIND_SORTS.map(([v, l]) => `<option value="${v}"${p.sort_by === v ? ' selected' : ''}>${l}</option>`).join('')}
           </select></label>
+      </div>
+      <div class="form-row" style="margin-top:8px">
+        <label class="field"><span class="field-label">RPM от, $</span>
+          <input type="number" id="fMinRpm" value="${p.min_rpm}" step="1" min="0"></label>
+        <label class="field"><span class="field-label">RPM до, $</span>
+          <input type="number" id="fMaxRpm" value="${p.max_rpm}" step="1" min="0"></label>
+        <label class="field"><span class="field-label">Длина видео от, мин</span>
+          <input type="number" id="fMinLen" value="${p.min_length_min}" step="1" min="0"></label>
+        <label class="field"><span class="field-label">Длина видео до, мин</span>
+          <input type="number" id="fMaxLen" value="${p.max_length_min}" step="1" min="0"></label>
+        <label class="field"><span class="field-label">Shorts</span>
+          <select id="fShorts">
+            <option value="any"${p.shorts === 'any' ? ' selected' : ''}>любые</option>
+            <option value="exclude"${p.shorts === 'exclude' ? ' selected' : ''}>без Shorts</option>
+            <option value="only"${p.shorts === 'only' ? ' selected' : ''}>только Shorts</option>
+          </select></label>
         <button class="btn" id="applyFind" type="button">Искать</button>
       </div>
       <div class="section-sub" style="margin-top:10px">Ищет по уже собранным видео через эмбеддинги title+description
-        (если тема не задана — просто просмотр по выбранной сортировке). Ничего не находит? Ниже квотированный
-        сбор новых данных с YouTube, или сначала загляните в раздел «Данные», чтобы проверить покрытие корпуса.</div>
+        (если тема не задана — просто просмотр по выбранной сортировке). RPM — оценка по официальной категории
+        YouTube видео (та же модель, что и в оценке дохода канала), не измеренная выплата; категория YouTube не
+        различает высокодоходные ниши вроде finance/business, поэтому оценка на практике не превышает ~$8 —
+        «RPM от $10» и выше всегда даст пустой список. Ничего не находит? Ниже квотированный сбор новых данных
+        с YouTube, или сначала загляните в раздел «Данные», чтобы проверить покрытие корпуса.</div>
     </div>
     ${d.results.length ? `<div class="cards">${d.results.map(videoCard).join('')}</div>`
                        : empty('под эти фильтры в собранной базе ничего не нашлось')}
@@ -141,6 +166,11 @@ async function viewFind() {
       query: $('#fQuery').value.trim(),
       min_outlier_score: +$('#fMinOutlier').value || 0,
       max_subscribers: $('#fMaxSubs').value ? +$('#fMaxSubs').value : '',
+      min_rpm: $('#fMinRpm').value ? +$('#fMinRpm').value : '',
+      max_rpm: $('#fMaxRpm').value ? +$('#fMaxRpm').value : '',
+      min_length_min: $('#fMinLen').value ? +$('#fMinLen').value : '',
+      max_length_min: $('#fMaxLen').value ? +$('#fMaxLen').value : '',
+      shorts: $('#fShorts').value,
       sort_by: $('#fFindSort').value,
     }));
     render();

@@ -199,12 +199,20 @@ def revenue_range(monthly_views: int) -> dict:
     }
 
 
+def rpm_effective(niche: str = "default") -> float:
+    """Effective RPM (after the monetisation discount) for a NexLev-style
+    niche label -- the per-video/per-category number search filters compare
+    against, and the building block revenue_niche() uses for a full estimate."""
+    rpm_base = NICHE_RPM.get((niche or "default").lower(), NICHE_RPM["default"])
+    return round(rpm_base * MONETISATION_DISCOUNT, 3)
+
+
 def revenue_niche(monthly_views: int, niche: str = "default") -> dict:
     rpm_base = NICHE_RPM.get((niche or "default").lower(), NICHE_RPM["default"])
-    rpm_total = rpm_base * MONETISATION_DISCOUNT
+    rpm_total = rpm_effective(niche)
     return {
         "rpm_base": rpm_base,
-        "rpm_effective": round(rpm_total, 3),
+        "rpm_effective": rpm_total,
         "monthly_usd": round(monthly_views / 1000 * rpm_total, 2),
         "model": "monthly_views/1000 * niche RPM * 0.70 monetisation discount",
     }

@@ -206,6 +206,7 @@ function videoCard(v) {
     <div class="vcard-chips">
       <span class="chip chip-accent" data-tip="Просмотров на одного подписчика — насколько видео вышло за пределы своей аудитории">VSR ${(+v.viewsPerSubscriber).toFixed(1)}</span>
       ${v.outlierBand ? `<span class="chip">${esc(v.outlierBand)}</span>` : ''}
+      ${v.estimatedRpm != null ? `<span class="chip" data-tip="Оценка RPM по категории видео, не измеренная выплата">~$${v.estimatedRpm} RPM</span>` : ''}
       ${v.acceleration != null ? `<span class="chip ${v.acceleration > 1.2 ? 'chip-good' : v.acceleration < 0.8 ? 'chip-bad' : ''}"
         data-tip="Ускорение: VPH сегодня против вчера">${v.acceleration > 1.2 ? '▲' : v.acceleration < 0.8 ? '▼' : '='} ${v.acceleration}</span>` : ''}
     </div>
