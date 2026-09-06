@@ -142,10 +142,12 @@ def keywords(period: str = "24h", period_by: str = "published", niche: str = Non
 @app.get("/api/outlier-channels")
 def outlier_channels(period: str = "24h", period_by: str = "discovered",
                      min_multiplier: float = 2.0, max_subscribers: int = None,
+                     min_subscribers: int = None,
                      niche: str = None, limit: int = 25):
     return T.recently_added_outlier_channels(
         period=period, period_by=period_by, min_multiplier=min_multiplier,
-        max_subscribers=max_subscribers, niche=niche, limit=limit)
+        max_subscribers=max_subscribers, min_subscribers=min_subscribers,
+        niche=niche, limit=limit)
 
 
 @app.get("/api/competition")
@@ -235,6 +237,11 @@ def channel_history(channel_id: str, limit: int = 400):
 @app.get("/api/channels/{channel_id}/similar")
 def similar_channels(channel_id: str, niche: str = None, limit: int = 10):
     return Q.similar_channels(channel_id, niche=niche, limit=limit)
+
+
+@app.get("/api/channels/{channel_id}/niche-overview")
+def channel_niche_overview(channel_id: str, period: str = "all", limit: int = 15):
+    return Q.niche_overview_from_channel(channel_id, limit=limit, period=period)
 
 
 @app.get("/api/title-changes")

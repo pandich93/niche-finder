@@ -320,18 +320,44 @@ async function viewViral() {
 /* --------------------------------------------------------- Outlier-каналы */
 
 async function viewChannels() {
-  const d = await api(`/api/outlier-channels${q({ ...base(), min_multiplier: 1.5, limit: 50 })}`);
+  const p = Object.assign(
+    { min_multiplier: 1.5, min_subscribers: '', max_subscribers: '' },
+    JSON.parse(localStorage.getItem('nf.channels') || '{}'));
+  const d = await api(`/api/outlier-channels${q({
+    ...base(), min_multiplier: p.min_multiplier,
+    min_subscribers: p.min_subscribers || null, max_subscribers: p.max_subscribers || null,
+    limit: 50,
+  })}`);
   view.innerHTML = `
     <div class="card">
-      ${sectionHead('Outlier-каналы', `${plabel(state.period)} · по попаданию в базу`)}
-      <div class="section-sub">Множитель — лучший возрастно-нормированный outlier среди
+      ${sectionHead('Outlier-каналы', `${plabel(state.period)} · по попаданию в базу — свежие возможности`)}
+      <div class="form-row">
+        <label class="field"><span class="field-label">Множитель не меньше</span>
+          <input type="number" id="fcMult" value="${p.min_multiplier}" step="0.5"></label>
+        <label class="field"><span class="field-label">Подписчиков не меньше</span>
+          <input type="number" id="fcMinSubs" value="${p.min_subscribers}" step="1000"></label>
+        <label class="field"><span class="field-label">Подписчиков не больше</span>
+          <input type="number" id="fcMaxSubs" value="${p.max_subscribers}" step="1000"></label>
+        <button class="btn" id="applyChannels" type="button">Применить</button>
+      </div>
+      <div class="section-sub" style="margin-top:10px">Множитель — лучший возрастно-нормированный outlier среди
         видео канала в окне, против медианы предыдущих загрузок этого же канала.
-        Полоса: &lt;2x, 2–3x, 3–5x, 5–10x, &gt;10x.</div>
+        Полоса: &lt;2x, 2–3x, 3–5x, 5–10x, &gt;10x. Отсортировано по силе множителя;
+        сузьте окно периода вверху, чтобы увидеть только самые свежие открытия.</div>
     </div>
     <div class="card">
       ${d.channels.length ? `<div class="rows">${d.channels.map(channelRow).join('')}</div>`
                           : empty(d.hint || 'нет каналов над порогом')}
     </div>`;
+
+  $('#applyChannels').addEventListener('click', () => {
+    localStorage.setItem('nf.channels', JSON.stringify({
+      min_multiplier: +$('#fcMult').value || 0,
+      min_subscribers: $('#fcMinSubs').value ? +$('#fcMinSubs').value : '',
+      max_subscribers: $('#fcMaxSubs').value ? +$('#fcMaxSubs').value : '',
+    }));
+    render();
+  });
 }
 
 /* ------------------------------------------------------------- Категории */
@@ -385,21 +411,27 @@ async function viewKeywords() {
     <div class="card">
       ${d.keywords.length ? table([
         { label: 'Фраза', wrap: true, render: (r) => esc(r.keyword) },
+        { label: 'Opportunity', num: true, render: (r) => r.opportunityScore != null
+            ? `<span class="chip ${r.opportunityScore >= 70 ? 'chip-good' : r.opportunityScore < 30 ? 'chip-bad' : ''}">${r.opportunityScore}</span>`
+            : '—' },
         { label: 'Видео', num: true, render: (r) => num(r.videos) },
         { label: 'Momentum', num: true, render: (r) => r.momentum ?? '—' },
         { label: 'Lift', num: true, render: (r) => r.outlierLift ?? '—' },
-        { label: 'trendScore', num: true, render: (r) => r.trendScore },
         { label: 'Доля', num: true, render: (r) => `${r.share}%` },
         { label: 'Медиана просмотров', num: true, render: (r) => compact(r.medianViews) },
         { label: 'Новая', render: (r) => (r.isNew ? 'да' : '') },
         { label: 'Пример', wrap: true, render: (r) => esc(r.examples?.[0]?.title || '') },
       ], d.keywords) : empty(d.hint || 'нет фраз над порогом')}
       <div class="section-sub" style="margin-top:14px">
+        <b>Opportunity</b> — 0-100, для удобства чтения: trendScore, растянутый по
+        мин/макс среди фраз именно этого экрана. Это НЕ настоящий keyword score вроде
+        vidIQ (для него нужен бы объём поиска YouTube, а такого API не существует) —
+        сравнивать это число между разными запросами или окнами нельзя, только внутри
+        одной текущей выдачи.<br>
         <b>momentum</b> — доля фразы в этом окне против доли в предыдущем таком же
         (со сглаживанием); больше 2 значит быстрый рост.<br>
         <b>outlierLift</b> — во сколько раз фраза повышает шансы видео пробить;
-        больше 1.5 значит, что фраза реально коррелирует с пробитиями.<br>
-        <b>trendScore</b> — log(1 + видео) × outlierLift × momentum.
+        больше 1.5 значит, что фраза реально коррелирует с пробитиями.
       </div>
     </div>`;
 }
@@ -449,12 +481,13 @@ async function viewNiches() {
   wireCollect(render);
 }
 
-async function viewNiche(slug) {
-  const d = await api(`/api/niches/${encodeURIComponent(slug)}${q({ period: state.period })}`);
-  if (!d.found) { view.innerHTML = notice(esc(d.hint || 'ниша не найдена')); return; }
-  view.innerHTML = `
+/* Общие тайлы + графики для нишевого обзора -- используется и по слагу
+   (viewNiche), и от канала (niche_overview_from_channel в viewChannel).
+   `head` -- готовый sectionHead(...) для верхней карточки. */
+function nicheOverviewBlock(d, head) {
+  return `
     <div class="card">
-      ${sectionHead(`Ниша: ${slug}`, `${esc(d.query || '')} · ${plabel(state.period)}`)}
+      ${head}
       <div class="tiles">
         ${tile('Видео', num(d.video_count))}
         ${tile('Каналов', num(d.channel_count))}
@@ -482,14 +515,22 @@ async function viewNiche(slug) {
     </div>`;
 }
 
+async function viewNiche(slug) {
+  const d = await api(`/api/niches/${encodeURIComponent(slug)}${q({ period: state.period })}`);
+  if (!d.found) { view.innerHTML = notice(esc(d.hint || 'ниша не найдена')); return; }
+  view.innerHTML = nicheOverviewBlock(d,
+    sectionHead(`Ниша: ${slug}`, `${esc(d.query || '')} · ${plabel(state.period)}`));
+}
+
 /* ----------------------------------------------------------------- Канал */
 
 async function viewChannel(id) {
-  const [a, vel, hist, sim] = await Promise.all([
+  const [a, vel, hist, sim, nicheOv] = await Promise.all([
     api(`/api/channels/${encodeURIComponent(id)}${q({ period: state.period })}`),
     api(`/api/channels/${encodeURIComponent(id)}/velocity${q({ period: state.period })}`),
     api(`/api/channels/${encodeURIComponent(id)}/history`),
     api(`/api/channels/${encodeURIComponent(id)}/similar`),
+    api(`/api/channels/${encodeURIComponent(id)}/niche-overview`),
   ]);
   view.innerHTML = `
     <div class="card">
@@ -574,6 +615,14 @@ async function viewChannel(id) {
           ], sim.similar)
         : empty(sim.hint || 'ничего похожего не нашлось в собранном корпусе')}
     </div>
+
+    ${nicheOv.found
+      ? nicheOverviewBlock(nicheOv, sectionHead('Нишевый обзор',
+          `по ${nicheOv.peer_channel_count} похожим каналам -- насыщенность и точки входа без сбора отдельной ниши`))
+      : `<div class="card">
+          ${sectionHead('Нишевый обзор')}
+          ${empty(nicheOv.hint || 'недостаточно данных для нишевого обзора')}
+        </div>`}
 
     <div class="card">
       ${sectionHead('Скорость по видео',

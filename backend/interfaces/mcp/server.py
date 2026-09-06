@@ -355,6 +355,22 @@ def similar_channels(channel_id: str, niche: str = None, limit: int = 10,
 
 
 @mcp.tool()
+def niche_overview_from_channel(channel_id: str, limit: int = 15,
+                                min_videos_embedded: int = 1,
+                                period: str = "all") -> dict:
+    """NexLev-style get_niche_overview(channelId): the same saturation/
+    opportunity read as niche_overview, but anchored on a channel instead of
+    a pre-collected niche slug. Finds the channel's closest peers via
+    similar_channels (embedding centroid, FREE/local) and runs the analysis
+    over the channel + its peers. FREE, no quota -- needs the channel to have
+    embedded videos, same requirement as similar_channels.
+    """
+    return q.niche_overview_from_channel(channel_id, limit=limit,
+                                         min_videos_embedded=min_videos_embedded,
+                                         period=period)
+
+
+@mcp.tool()
 def list_niches() -> list:
     """Every niche collected so far (slug, query, last collected, video count)."""
     return q.list_niches()

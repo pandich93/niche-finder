@@ -449,6 +449,29 @@ def most_popular_categories(period="7d", period_by="published", niche=None, regi
 
 # ---------------------------------------------------- 3. Trending keywords
 
+def _add_opportunity_scores(ranked):
+    """vidIQ-style single 0-100 'opportunity score', added in place.
+
+    There is no YouTube search-volume API to build a real vidIQ keyword score
+    from (see the trendScore legend below), so this is a friendlier read of
+    the same momentum/outlierLift/trendScore numbers already computed here --
+    trendScore min-max scaled to 0-100 *within this result set*. It is a
+    relative ranking aid for the phrases currently on screen, not a portable,
+    absolute score you can compare across different queries or time windows.
+    """
+    scores = [r["trendScore"] for r in ranked if r.get("trendScore") is not None]
+    if not scores:
+        return
+    lo, hi = min(scores), max(scores)
+    span = hi - lo
+    for r in ranked:
+        ts = r.get("trendScore")
+        if ts is None:
+            r["opportunityScore"] = None
+        else:
+            r["opportunityScore"] = round(100 * (ts - lo) / span) if span > 0 else 100
+
+
 def trending_keywords(period="7d", period_by="published", niche=None, region=None,
                       languages=None, category_id=None, max_subscribers=None,
                       exclude_shorts=False, source="both", ngram_max=3, min_videos=3,
@@ -482,6 +505,7 @@ def trending_keywords(period="7d", period_by="published", niche=None, region=Non
 
     ranked = K.score(stats, total, base_rate, prev_stats or None, prev_total,
                      min_videos=min_videos, top_n=top_n, sort_by=sort_by)
+    _add_opportunity_scores(ranked)
     tagged = sum(1 for r in rows if r["tags"] and r["tags"] not in ("[]", "null"))
     hint = None
     if not ranked:
@@ -505,6 +529,9 @@ def trending_keywords(period="7d", period_by="published", niche=None, region=Non
             "momentum": "share this period / share last period (Laplace-smoothed); >2 is rising fast",
             "outlierLift": f"P(outlier>={outlier_threshold} | phrase) / P(outlier>={outlier_threshold}); >1.5 means the phrase correlates with breakouts",
             "trendScore": "log(1+videos) * outlierLift * momentum",
+            "opportunityScore": "trendScore min-max scaled to 0-100 within this result set -- "
+                                "a relative ranking aid, not a vidIQ-style absolute keyword score "
+                                "(no YouTube search-volume API exists to build a real one from)",
         },
         "keywords": ranked,
     }
