@@ -22,6 +22,7 @@ except Exception:  # pragma: no cover
     pass
 
 import infrastructure.postgres as db
+import infrastructure.youtube.client as yt
 from infrastructure.categories import repository as C
 from application import collecting as collector
 from application import search as Q
@@ -52,6 +53,12 @@ def _need_key():
         )
 
 
+@app.exception_handler(yt.QuotaExceeded)
+async def _quota_exceeded(request, exc):
+    return JSONResponse(status_code=429, content={"error": "QuotaExceeded",
+                                                  "detail": str(exc)[:800]})
+
+
 @app.exception_handler(Exception)
 async def _unhandled(request, exc):  # pragma: no cover
     msg = str(exc)
@@ -66,11 +73,21 @@ async def _unhandled(request, exc):  # pragma: no cover
 @app.get("/api/health")
 def health():
     s = Q.db_stats()
+    conn = db.get_conn()
+    try:
+        calls_today = collector.search_calls_today(conn)
+    finally:
+        conn.close()
     return {
         "ok": True,
         "hasApiKey": bool(API_KEY),
         "db": s,
         "historyAvailable": bool(s["history_since"]),
+        "searchQuota": {
+            "callsToday": calls_today,
+            "dailyLimit": yt.SEARCH_DAILY_CALL_LIMIT,
+            "callsLeft": max(0, yt.SEARCH_DAILY_CALL_LIMIT - calls_today),
+        },
     }
 
 

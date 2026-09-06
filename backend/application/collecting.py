@@ -168,6 +168,12 @@ def collect_niche(api_key: str, query: str, label: str = None, language: str = N
 
     Cost: `pages` search calls out of the 100/day search budget, plus ~1 unit
     per 50 videos and per 50 channels from the shared pool.
+
+    The niche row and every search call already spent are committed as they
+    happen (not only at the very end), so a mid-loop failure -- most commonly
+    `QuotaExceeded` once the 100/day search.list bucket runs out -- never makes
+    it look like "nothing was added": the niche still exists, just empty or
+    partially filled, ready to resume once the budget resets.
     """
     if period and not min_upload_date:
         c = P.cutoff(period)
@@ -176,52 +182,63 @@ def collect_niche(api_key: str, query: str, label: str = None, language: str = N
 
     slug = slugify(label or query)
     conn = db.get_conn()
-    db.upsert_niche(conn, slug, query, label or query)
-
-    video_ids, token = [], None
-    search_calls = 0
-    for _ in range(max(1, pages)):
-        resp = yt.search_videos(
-            api_key, query, published_after=min_upload_date,
-            relevance_language=language, region_code=region,
-            video_category_id=category_id, order=order, page_token=token,
-            video_duration=video_duration,
-        )
-        search_calls += 1
-        for item in resp.get("items", []):
-            vid = (item.get("id") or {}).get("videoId")
-            if vid:
-                video_ids.append(vid)
-        token = resp.get("nextPageToken")
-        if not token:
-            break
-
-    calls_today = _record_search_calls(conn, search_calls)
-
-    video_ids = list(dict.fromkeys(video_ids))
-    if not video_ids:
+    try:
+        db.upsert_niche(conn, slug, query, label or query)
         conn.commit()
+
+        calls_today = search_calls_today(conn)
+        if calls_today >= yt.SEARCH_DAILY_CALL_LIMIT:
+            raise yt.QuotaExceeded(
+                f"Дневной лимит поиска исчерпан ({calls_today}/{yt.SEARCH_DAILY_CALL_LIMIT}). "
+                "search.list сбрасывается в полночь по Тихоокеанскому времени. "
+                f"Ниша '{slug}' уже создана (пока пустая) -- запустите тот же поиск "
+                "позже, или используйте collect_channel/collect_trending, которые "
+                "не тратят эту квоту."
+            )
+
+        video_ids, token = [], None
+        search_calls = 0
+        for _ in range(max(1, pages)):
+            resp = yt.search_videos(
+                api_key, query, published_after=min_upload_date,
+                relevance_language=language, region_code=region,
+                video_category_id=category_id, order=order, page_token=token,
+                video_duration=video_duration,
+            )
+            search_calls += 1
+            calls_today = _record_search_calls(conn, 1)
+            conn.commit()
+            for item in resp.get("items", []):
+                vid = (item.get("id") or {}).get("videoId")
+                if vid:
+                    video_ids.append(vid)
+            token = resp.get("nextPageToken")
+            if not token:
+                break
+
+        video_ids = list(dict.fromkeys(video_ids))
+        if not video_ids:
+            return {"niche": slug, "query": query, "videos_found": 0,
+                    "quota": _quota(search_calls, 0, 0, calls_today=calls_today),
+                    "min_upload_date": min_upload_date}
+
+        video_items = yt.videos_list(api_key, video_ids)
+        channel_ids = list({(v.get("snippet") or {}).get("channelId")
+                            for v in video_items if v.get("snippet")})
+        channel_items = yt.channels_list(api_key, [c for c in channel_ids if c])
+
+        now = db.now_iso()
+        store_channels(conn, channel_items, now)
+        stored = store_videos(conn, video_items, slug, region, embed, now)
+        conn.commit()
+        return {
+            "niche": slug, "query": query, "min_upload_date": min_upload_date,
+            "videos_found": len(video_ids), "videos_stored": stored,
+            "channels_stored": len(channel_items),
+            "quota": _quota(search_calls, len(video_ids), len(channel_ids), calls_today=calls_today),
+        }
+    finally:
         conn.close()
-        return {"niche": slug, "query": query, "videos_found": 0,
-                "quota": _quota(search_calls, 0, 0, calls_today=calls_today),
-                "min_upload_date": min_upload_date}
-
-    video_items = yt.videos_list(api_key, video_ids)
-    channel_ids = list({(v.get("snippet") or {}).get("channelId")
-                        for v in video_items if v.get("snippet")})
-    channel_items = yt.channels_list(api_key, [c for c in channel_ids if c])
-
-    now = db.now_iso()
-    store_channels(conn, channel_items, now)
-    stored = store_videos(conn, video_items, slug, region, embed, now)
-    conn.commit()
-    conn.close()
-    return {
-        "niche": slug, "query": query, "min_upload_date": min_upload_date,
-        "videos_found": len(video_ids), "videos_stored": stored,
-        "channels_stored": len(channel_items),
-        "quota": _quota(search_calls, len(video_ids), len(channel_ids), calls_today=calls_today),
-    }
 
 
 def _record_search_calls(conn, n: int) -> int:

@@ -67,7 +67,7 @@ function wireCollect(refresh) {
     try {
       const r = await api(path, { method: 'POST', body });
       toast(ok(r), 'ok');
-      await refresh();
+      await Promise.all([refresh(), loadFootStat()]);
     } catch (e) { toast(e.message, 'err'); } finally { busy(btn, false); }
   };
   $('#collectBtn')?.addEventListener('click', () => {
@@ -91,6 +91,61 @@ function wireCollect(refresh) {
       { query, period: $('#collectPeriod').value || null },
       (r) => `«${r.query}»: ${r.videos_stored ?? 0} видео, потрачен ${r.quota.search_calls} поиск`);
   });
+}
+
+/* ------------------------------------------------- Найти нишу (бесплатно) */
+
+const FIND_SORTS = [
+  ['outlier', 'множитель'], ['outlier_adjusted', 'множитель с поправкой на возраст'],
+  ['views', 'просмотры'], ['vph', 'VPH за 24ч'], ['velocity', 'прирост за сутки'],
+  ['engagement', 'вовлечённость'], ['acceleration', 'ускорение'], ['published', 'дата публикации'],
+];
+
+async function viewFind() {
+  const p = Object.assign(
+    { query: '', min_outlier_score: 0, max_subscribers: '', sort_by: 'outlier' },
+    JSON.parse(localStorage.getItem('nf.find') || '{}'));
+  const d = await api(`/api/search${q({
+    ...base(), query: p.query || null,
+    min_outlier_score: p.min_outlier_score || null,
+    max_subscribers: p.max_subscribers || null,
+    sort_by: p.sort_by, limit: 30,
+  })}`);
+
+  view.innerHTML = `
+    <div class="card">
+      ${sectionHead('Найти нишу', 'семантический поиск по уже собранной базе — бесплатно, квота YouTube не тратится')}
+      <div class="form-row">
+        <label class="field" style="flex:2"><span class="field-label">Тема на естественном языке (необязательно)</span>
+          <input type="text" id="fQuery" placeholder="расслабляющие видео о природе" value="${esc(p.query)}"></label>
+        <label class="field"><span class="field-label">Множитель не меньше</span>
+          <input type="number" id="fMinOutlier" value="${p.min_outlier_score}" step="0.5"></label>
+        <label class="field"><span class="field-label">Подписчиков не больше</span>
+          <input type="number" id="fMaxSubs" value="${p.max_subscribers}" step="1000"></label>
+        <label class="field"><span class="field-label">Сортировка</span>
+          <select id="fFindSort">
+            ${FIND_SORTS.map(([v, l]) => `<option value="${v}"${p.sort_by === v ? ' selected' : ''}>${l}</option>`).join('')}
+          </select></label>
+        <button class="btn" id="applyFind" type="button">Искать</button>
+      </div>
+      <div class="section-sub" style="margin-top:10px">Ищет по уже собранным видео через эмбеддинги title+description
+        (если тема не задана — просто просмотр по выбранной сортировке). Ничего не находит? Ниже квотированный
+        сбор новых данных с YouTube, или сначала загляните в раздел «Данные», чтобы проверить покрытие корпуса.</div>
+    </div>
+    ${d.results.length ? `<div class="cards">${d.results.map(videoCard).join('')}</div>`
+                       : empty('под эти фильтры в собранной базе ничего не нашлось')}
+    ${collectForm()}`;
+
+  $('#applyFind').addEventListener('click', () => {
+    localStorage.setItem('nf.find', JSON.stringify({
+      query: $('#fQuery').value.trim(),
+      min_outlier_score: +$('#fMinOutlier').value || 0,
+      max_subscribers: $('#fMaxSubs').value ? +$('#fMaxSubs').value : '',
+      sort_by: $('#fFindSort').value,
+    }));
+    render();
+  });
+  wireCollect(render);
 }
 
 /* --------------------------------------------------------------- Обзор */
@@ -888,6 +943,7 @@ cp .env.example .env   # впишите YOUTUBE_API_KEY</code></pre>
 
 const ROUTES = {
   overview: { title: 'Обзор', run: viewOverview },
+  find: { title: 'Найти нишу', run: viewFind },
   viral: { title: 'Вирусные видео', run: viewViral },
   channels: { title: 'Outlier-каналы', run: viewChannels },
   categories: { title: 'Категории', run: viewCategories },
@@ -936,9 +992,11 @@ async function loadNiches() {
 async function loadFootStat() {
   try {
     const h = await api('/api/health');
+    const sq = h.searchQuota;
     $('#footStat').innerHTML =
       `${num(h.db.channels)} каналов · ${num(h.db.videos)} видео<br>` +
-      (h.historyAvailable ? 'история пишется' : 'истории нет — запустите воркер');
+      (h.historyAvailable ? 'история пишется' : 'истории нет — запустите воркер') +
+      (sq ? `<br>Поиск: ${sq.callsLeft}/${sq.dailyLimit} осталось сегодня` : '');
     $('#brandTag').textContent = h.hasApiKey ? 'local' : 'без ключа';
   } catch { $('#footStat').textContent = 'сервис недоступен'; }
 }
