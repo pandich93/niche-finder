@@ -558,6 +558,62 @@ def trending_keywords(period="7d", period_by="published", niche=None, region=Non
     }
 
 
+def top_tags_by_category(period="7d", period_by="published", niche=None, region=None,
+                         languages=None, exclude_shorts=False, min_videos=3, top_n=15,
+                         outlier_threshold=3.0) -> dict:
+    """Literal YouTube tags -- exactly as the creator set them, never split
+    into words -- ranked per category by how many videos use them and how
+    much that tag correlates with an outlier result.
+
+    Unlike trending_keywords(source="tags"), which N-grams tag text into
+    topical phrases, this is for "what tags do winning videos in category X
+    actually use" -- one call, every category with a qualifying tag,
+    ranked busiest-category-first.
+    """
+    rows = load_window(period=period, niche=niche, region=region, languages=languages,
+                       exclude_shorts=exclude_shorts, period_by=period_by)
+    by_category = defaultdict(list)
+    for r in rows:
+        by_category[str(r["category_id"]) if r["category_id"] else "unknown"].append(r)
+
+    def shape(rs):
+        return [{"video_id": r["video_id"], "title": r["title"], "tags": r["tags"],
+                 "views": r["view_count"] or 0,
+                 "outlier": r["outlierScore"] or r["outlierScoreNexlev"]} for r in rs]
+
+    categories = []
+    for cid, rs in by_category.items():
+        stats, total, base_rate = K.aggregate(shape(rs), phrase_fn=K.literal_tags_for_video,
+                                              outlier_threshold=outlier_threshold)
+        ranked = K.score(stats, total, base_rate, min_videos=min_videos, top_n=top_n,
+                         sort_by="count", collapse=False)
+        for r in ranked:
+            r["tag"] = r.pop("keyword")
+        if not ranked:
+            continue
+        categories.append({
+            "categoryId": cid,
+            "category": C.title_for(cid, region or "US"),
+            "videosAnalysed": total,
+            "tags": ranked,
+        })
+    categories.sort(key=lambda c: -c["videosAnalysed"])
+
+    return {
+        "period": period,
+        "periodBy": period_by,
+        "minVideos": min_videos,
+        "topN": top_n,
+        "quotaUsed": 0,
+        "hint": None if categories else (
+            f"Ни одного тега, встречающегося в >= {min_videos} видео ни в одной "
+            f"категории. Понизьте min_videos или возьмите период шире."
+            if rows else
+            f"В окне {period} по '{period_by}' нет видео — сначала соберите корпус."),
+        "categories": categories,
+    }
+
+
 # ------------------------------------------------------------ corpus health
 
 def coverage(period="7d") -> dict:

@@ -98,8 +98,29 @@ def phrases_for_video(row, use_tags: bool = True, use_title: bool = True,
     return {g for g in grams if g and g not in STOPWORDS}
 
 
-def aggregate(rows, use_tags=True, use_title=True, n_max=3, outlier_threshold=3.0):
-    """rows: dicts with title/tags/views/outlier/vsr. Returns per-phrase stats."""
+def literal_tags_for_video(row) -> set:
+    """Distinct literal tags for one video, exactly as the creator set them
+    (lowercased/trimmed for dedup only) -- no tokenization or n-gramming,
+    unlike phrases_for_video. Pass as `aggregate`'s phrase_fn when the whole
+    tag is the unit of interest (top-tags-by-category), not its words."""
+    raw = row.get("tags")
+    tags = []
+    if raw:
+        try:
+            tags = json.loads(raw) if isinstance(raw, str) else list(raw)
+        except (ValueError, TypeError):
+            tags = []
+    return {t.strip().lower() for t in tags if isinstance(t, str) and t.strip()}
+
+
+def aggregate(rows, use_tags=True, use_title=True, n_max=3, outlier_threshold=3.0,
+              phrase_fn=None):
+    """rows: dicts with title/tags/views/outlier/vsr. Returns per-phrase stats.
+
+    phrase_fn overrides how a video's phrases are derived (default: N-gram
+    phrases via phrases_for_video) -- e.g. literal_tags_for_video for
+    whole-tag aggregation instead of tokenized N-grams."""
+    get_phrases = phrase_fn or (lambda row: phrases_for_video(row, use_tags, use_title, n_max))
     stats = defaultdict(lambda: {"videos": 0, "views": 0, "view_list": [],
                                  "outliers": [], "hits": 0, "examples": [],
                                  "video_ids": set()})
@@ -109,7 +130,7 @@ def aggregate(rows, use_tags=True, use_title=True, n_max=3, outlier_threshold=3.
         total_videos += 1
         is_hit = (row.get("outlier") or 0) >= outlier_threshold
         total_hits += 1 if is_hit else 0
-        for phrase in phrases_for_video(row, use_tags, use_title, n_max):
+        for phrase in get_phrases(row):
             s = stats[phrase]
             s["videos"] += 1
             s["video_ids"].add(row.get("video_id"))

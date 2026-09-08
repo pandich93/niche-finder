@@ -155,6 +155,15 @@ def keywords(period: str = "24h", period_by: str = "published", niche: str = Non
         min_videos=min_videos, top_n=top_n)
 
 
+@app.get("/api/tags/top-by-category")
+def top_tags_by_category(period: str = "7d", period_by: str = "published", niche: str = None,
+                         region: str = None, exclude_shorts: bool = False,
+                         min_videos: int = 3, top_n: int = 15):
+    return trends.top_tags_by_category(
+        period=period, period_by=period_by, niche=niche, region=region,
+        exclude_shorts=exclude_shorts, min_videos=min_videos, top_n=top_n)
+
+
 @app.get("/api/outlier-channels")
 def outlier_channels(period: str = "24h", period_by: str = "discovered",
                      min_multiplier: float = 2.0, max_subscribers: int = None,
