@@ -355,6 +355,22 @@ def similar_channels(channel_id: str, niche: str = None, limit: int = 10,
 
 
 @mcp.tool()
+def similar_videos(video_id: str, niche: str = None, limit: int = 10,
+                   exclude_same_channel: bool = False) -> dict:
+    """Videos whose title+description embedding reads closest to this one
+    (NexLev's "Similar Videos"). FREE, no quota, local corpus only.
+
+    Both the target video and the candidates need an embedding --
+    collect_channel/track_channel default to embed=False; backfill_embeddings
+    fills in videos collected that way. Optionally scope the comparison pool
+    with `niche`, or exclude the video's own channel to surface competitors
+    instead of the creator's own back-catalogue.
+    """
+    return q.similar_videos(video_id, niche=niche, limit=limit,
+                            exclude_same_channel=exclude_same_channel)
+
+
+@mcp.tool()
 def niche_overview_from_channel(channel_id: str, limit: int = 15,
                                 min_videos_embedded: int = 1,
                                 period: str = "all") -> dict:
@@ -485,6 +501,119 @@ def calibrate_maturity_curve(min_videos: int = 30) -> dict:
     a replacement for metrics.MATURITY_CURVE, so age-adjusted outlier scores stop
     relying on the shipped default. Needs ~30 videos watched from publication."""
     return T.calibrate_maturity_curve(min_videos=min_videos)
+
+
+@mcp.tool()
+def save_item(kind: str, ref_id: str, payload: dict = None, note: str = None,
+             folder: str = None) -> dict:
+    """Swipe file: save a video or channel id you noticed, with an optional
+    snapshot of the metrics it had at the time (pass the dict another tool
+    just returned, e.g. inspect_video's result). Zero quota, local only."""
+    from application import library as lib
+    return lib.save_item(kind, ref_id, payload=payload, note=note, folder=folder)
+
+
+@mcp.tool()
+def list_saved_items(kind: str = None, folder: str = None, limit: int = 200) -> list:
+    """List the swipe file, optionally filtered by kind ('video'/'channel')
+    and/or folder."""
+    from application import library as lib
+    return lib.list_items(kind=kind, folder=folder, limit=limit)
+
+
+@mcp.tool()
+def delete_saved_item(item_id: int) -> dict:
+    """Remove one swipe-file entry by id."""
+    from application import library as lib
+    return lib.delete_item(item_id)
+
+
+# ---------------------------------------------------- metadata review (8.8)
+
+@mcp.tool()
+def review_metadata(title: str, description: str = "", tags: list = None,
+                    niche: str = None, channel_id: str = None, is_short: bool = False,
+                    period: str = "180d") -> dict:
+    """Check a draft title/description/tags against your own corpus for this
+    niche and/or channel -- signals only (length, structure, tag overlap,
+    near-duplicate topics), each with its own sample size, never a single
+    made-up score. Zero quota, local only. Pass niche and/or channel_id, or
+    every signal comes back marked unreliable by design. Wording suggestions
+    are not generated here -- once you see which signals are off, ask me
+    (the model) to propose actual title text based on what this returned;
+    that's the point of exposing facts instead of a canned rewrite."""
+    from application import metadata_review as mr
+    return mr.review_metadata(title, description=description, tags=tags or [],
+                              niche=niche, channel_id=channel_id, is_short=is_short,
+                              period=period)
+
+
+@mcp.tool()
+def save_draft(title: str, description: str = "", tags: list = None, niche: str = None,
+              channel_id: str = None, is_short: bool = False, review: dict = None) -> dict:
+    """Save a metadata draft (optionally with the review_metadata snapshot
+    attached) so it can be linked to the real video_id after publishing and
+    checked against actual outcomes later via draft_outcomes."""
+    from application import metadata_review as mr
+    return mr.save_draft(title, description=description, tags=tags or [], niche=niche,
+                         channel_id=channel_id, is_short=is_short, review=review)
+
+
+@mcp.tool()
+def list_drafts(channel_id: str = None, unpublished_only: bool = False,
+                limit: int = 100) -> list:
+    """List saved metadata drafts, optionally only the ones not yet linked
+    to a published video."""
+    from application import metadata_review as mr
+    return mr.list_drafts(channel_id=channel_id, unpublished_only=unpublished_only,
+                          limit=limit)
+
+
+@mcp.tool()
+def link_draft(draft_id: int, video_id: str) -> dict:
+    """Call once a saved draft has actually been published, so draft_outcomes
+    can later compare what the review predicted to what really happened."""
+    from application import metadata_review as mr
+    return mr.link_draft(draft_id, video_id)
+
+
+@mcp.tool()
+def draft_outcomes(min_age_days: float = 7.0) -> list:
+    """For linked drafts old enough to have real view counts, return the
+    review snapshot next to the actual outcome -- the only honest way to
+    learn whether these signals predict anything for YOUR channel. Does not
+    itself judge right/wrong; hands both numbers back."""
+    from application import metadata_review as mr
+    return mr.draft_outcomes(min_age_days=min_age_days)
+
+
+# ------------------------------------------------------------- alerts (8.9)
+
+@mcp.tool()
+def scan_for_alerts() -> dict:
+    """Run the alert scan right now instead of waiting for the worker's own
+    schedule: new outlier (x>=3) on a tracked channel, a video accelerating
+    (x>=2), a title changed, or a channel posting again after a silent
+    stretch. Zero quota -- reads only what's already collected. Idempotent:
+    re-running never creates duplicate events for the same occurrence."""
+    from application import alerts as alerts_mod
+    return alerts_mod.scan()
+
+
+@mcp.tool()
+def list_events(unseen_only: bool = False, kind: str = None, limit: int = 100) -> list:
+    """List alert events, optionally filtered to unseen ones or one kind
+    ('outlier'/'acceleration'/'title_change'/'silence_break')."""
+    from application import alerts as alerts_mod
+    return alerts_mod.list_events(unseen_only=unseen_only, kind=kind, limit=limit)
+
+
+@mcp.tool()
+def mark_events_seen(ids: list = None, all_unseen: bool = False) -> dict:
+    """Mark specific event ids (or every unseen event, with all_unseen=True)
+    as seen."""
+    from application import alerts as alerts_mod
+    return alerts_mod.mark_seen(ids=ids, all_unseen=all_unseen)
 
 
 def run():

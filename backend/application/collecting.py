@@ -111,6 +111,7 @@ def store_videos(conn, video_items, niche_slug=None, region=None, embed=True,
         sn = v.get("snippet", {}) or {}
         stt = v.get("statistics", {}) or {}
         cd = v.get("contentDetails", {}) or {}
+        status = v.get("status", {}) or {}
         title = sn.get("title", "") or ""
         desc = sn.get("description", "") or ""
         duration = yt.parse_duration(cd.get("duration"))
@@ -144,6 +145,13 @@ def store_videos(conn, video_items, niche_slug=None, region=None, embed=True,
             "is_short": 1 if M.is_short(duration) else 0,
             "topic_categories": _topics(v),
             "live_content": sn.get("liveBroadcastContent"),
+            # official AI-disclosure flag (added 30 Oct 2024). The creator sets
+            # this voluntarily -- it measures DISCLOSED synthetic content, not
+            # actual AI use, and status is missing entirely for very old videos.
+            "contains_synthetic_media": (
+                1 if status.get("containsSyntheticMedia") else
+                (0 if "containsSyntheticMedia" in status else None)
+            ),
         }
         db.upsert_video(conn, row)
         db.record_video_stats(conn, v["id"], views, likes, comments, title, thumb, now)
@@ -373,6 +381,74 @@ def collect_channel(api_key: str, channel_ref: str, max_videos: int = 100,
         "channelTitle": (ch.get("snippet") or {}).get("title"),
         "videos_found": len(ids), "videos_stored": stored,
         "quota": _quota(0, len(ids), 1, playlist_calls=playlist_calls),
+    }
+
+
+# --------------------------------------------- discover_new_videos_via_rss
+
+def discover_new_videos_via_rss(api_key: str, channel_ids=None, max_new_per_channel: int = 15,
+                                max_total: int = 300, embed: bool = False) -> dict:
+    """Cheapest possible way to notice a tracked channel's new upload.
+
+    YouTube's per-channel RSS feed (rss.fetch_channel_feed) costs no API key
+    and no quota at all -- it just doesn't carry view counts, so this is a
+    *novelty detector*, not a stats refresh. For every channel we already
+    know, diff the feed's video ids against what's stored; whatever is new
+    gets a single videos.list call (1 unit per 50), same as any other path.
+
+    Channels that published more than the feed's ~15-entry window since the
+    last check will have some new videos missed here -- that's an accepted
+    trade-off; collect_channel's full playlist walk remains the way to
+    backfill a channel from scratch or catch up after a long gap.
+    """
+    import infrastructure.youtube.rss as rss
+
+    conn = db.get_conn()
+    if channel_ids:
+        ids = list(dict.fromkeys(channel_ids))
+    else:
+        ids = [r["channel_id"] for r in conn.execute(
+            "SELECT channel_id FROM tracked_channels WHERE active=1").fetchall()]
+
+    channels_checked, channels_failed = 0, 0
+    all_new_ids = []
+    per_channel_new = {}
+    for channel_id in ids:
+        known = {r["video_id"] for r in conn.execute(
+            "SELECT video_id FROM videos WHERE channel_id=?", (channel_id,)).fetchall()}
+        try:
+            fresh = rss.new_video_ids(channel_id, known)
+        except Exception:
+            channels_failed += 1
+            continue
+        channels_checked += 1
+        fresh = fresh[:max_new_per_channel]
+        if fresh:
+            per_channel_new[channel_id] = fresh
+            all_new_ids.extend(fresh)
+        if len(all_new_ids) >= max_total:
+            break
+    conn.close()
+
+    all_new_ids = all_new_ids[:max_total]
+    if not all_new_ids:
+        return {"channels_checked": channels_checked, "channels_failed": channels_failed,
+                "new_videos_found": 0, "videos_stored": 0,
+                "quota": {"units_from_shared_pool": 0, "search_calls": 0}}
+
+    items = yt.videos_list(api_key, all_new_ids)
+    conn = db.get_conn()
+    now = db.now_iso()
+    stored = store_videos(conn, items, embed=embed, now=now)
+    conn.commit()
+    conn.close()
+    return {
+        "channels_checked": channels_checked, "channels_failed": channels_failed,
+        "channels_with_new_videos": len(per_channel_new),
+        "new_videos_found": len(all_new_ids), "videos_stored": stored,
+        "quota": {"units_from_shared_pool": (len(all_new_ids) + 49) // 50, "search_calls": 0},
+        "note": "RSS itself is free; the units above are only the videos.list "
+                "call for the newly discovered ids",
     }
 
 

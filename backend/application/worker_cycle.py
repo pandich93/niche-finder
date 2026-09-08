@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 
 import infrastructure.postgres as db
 from application import collecting as collector
+from application import alerts as alerts_mod
 from domain import periods as P
 import infrastructure.youtube.client as yt
 
@@ -36,6 +37,8 @@ except Exception:  # pragma: no cover
 
 API_KEY = os.environ.get("YOUTUBE_API_KEY")
 
+RSS_INTERVAL_MIN = int(os.environ.get("WORKER_RSS_INTERVAL_MIN", "30"))
+ALERTS_INTERVAL_MIN = int(os.environ.get("WORKER_ALERTS_INTERVAL_MIN", "60"))
 HOT_INTERVAL_MIN = int(os.environ.get("WORKER_HOT_INTERVAL_MIN", "180"))
 DAILY_INTERVAL_MIN = int(os.environ.get("WORKER_DAILY_INTERVAL_MIN", "1440"))
 HOT_PERIOD = os.environ.get("WORKER_HOT_PERIOD", "7d")
@@ -114,10 +117,18 @@ def _safe(name, fn):
 
 
 def cycle():
+    if _due("rss", RSS_INTERVAL_MIN):
+        _safe("rss watch", lambda: collector.discover_new_videos_via_rss(API_KEY))
+        _mark("rss")
+
     if _due("hot", HOT_INTERVAL_MIN):
         _safe("hot refresh", lambda: collector.refresh_stats(
             API_KEY, scope="recent", period=HOT_PERIOD, limit=HOT_LIMIT))
         _mark("hot")
+
+    if _due("alerts", ALERTS_INTERVAL_MIN):
+        _safe("alerts scan", lambda: alerts_mod.scan())
+        _mark("alerts")
 
     if _due("daily", DAILY_INTERVAL_MIN):
         _safe("full refresh", lambda: collector.refresh_stats(
@@ -148,7 +159,9 @@ def main():
     signal.signal(signal.SIGTERM, _handle_stop)
     signal.signal(signal.SIGINT, _handle_stop)
     db.init_db()
-    log(f"worker started | db={db.display_dsn()} | hot every {HOT_INTERVAL_MIN}min "
+    log(f"worker started | db={db.display_dsn()} | rss watch every {RSS_INTERVAL_MIN}min | "
+        f"alerts scan every {ALERTS_INTERVAL_MIN}min | "
+        f"hot every {HOT_INTERVAL_MIN}min "
         f"({HOT_PERIOD}) | daily every {DAILY_INTERVAL_MIN}min ({FULL_PERIOD}) "
         f"| regions={REGIONS} | trending={DO_TRENDING} | queries={len(QUERIES)}")
     while not _stop:

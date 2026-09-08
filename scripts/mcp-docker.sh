@@ -12,15 +12,47 @@
 # once, and joins that network by name so `POSTGRES_HOST=postgres` resolves.
 set -eu
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-ENV_ARG=""
-[ -f "$DIR/.env" ] && ENV_ARG="--env-file $DIR/.env"
-[ -z "$ENV_ARG" ] && [ -f "$DIR/backend/.env" ] && ENV_ARG="--env-file $DIR/backend/.env"
+
+ENV_FILE=""
+[ -f "$DIR/.env" ] && ENV_FILE="$DIR/.env"
+[ -z "$ENV_FILE" ] && [ -f "$DIR/backend/.env" ] && ENV_FILE="$DIR/backend/.env"
+
+# ВАЖНО: здесь НЕЛЬЗЯ использовать `docker run --env-file`.
+# `docker compose` парсит .env по правилам dotenv и снимает кавычки вокруг
+# значения, а `docker run --env-file` читает строку буквально — и
+# YOUTUBE_API_KEY="AIza..." уезжает в контейнер вместе с кавычками. Тогда
+# воркер (через compose) работает, а MCP-сервер получает битый ключ и КАЖДЫЙ
+# вызов к YouTube API падает. Ровно это сломало сессию 6 сентября 2026.
+# Поэтому разбираем файл сами и снимаем обрамляющие кавычки.
+set --
+if [ -n "$ENV_FILE" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=$(printf '%s' "$line" | tr -d '\r')
+    line=${line# }
+    line=${line#export }
+    case "$line" in
+      ''|\#*) continue ;;
+      *=*) ;;
+      *) continue ;;
+    esac
+    name=${line%%=*}
+    value=${line#*=}
+    case "$name" in
+      ''|*[!A-Za-z0-9_]*) continue ;;
+    esac
+    case "$value" in
+      '"'*'"') value=${value#\"}; value=${value%\"} ;;
+      "'"*"'") value=${value#\'}; value=${value%\'} ;;
+    esac
+    set -- "$@" -e "$name=$value"
+  done < "$ENV_FILE"
+fi
 
 # Код монтируется из репозитория, поэтому Claude Desktop всегда запускает
 # текущую версию — пересобирать образ нужно только при смене requirements.txt.
 exec docker run --rm -i \
   --network niche-finder_default \
-  $ENV_ARG \
+  "$@" \
   -e POSTGRES_HOST=postgres \
   -v "$DIR/backend:/app:ro" \
   -v niche-finder-models:/models \

@@ -3,12 +3,16 @@
 Schema v2 adds everything needed for *time-window* analytics (24h / 7d / 30d):
 history snapshots of video and channel stats, a tracked-channel watchlist,
 chart snapshots, and title/thumbnail change detection.
+
+Schema v3 (iteration 8) adds the swipe file (saved_items), metadata-review
+drafts with their post-publish outcome (drafts), and worker-generated
+alerts (events) -- see docs/plan-iteration-8.md.
 """
 from datetime import datetime, timezone
 
 from infrastructure.postgres.connection import get_conn  # noqa: F401  (re-export for callers)
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS channels (
@@ -131,6 +135,46 @@ CREATE INDEX IF NOT EXISTS idx_video_niches_slug ON video_niches(niche_slug);
 CREATE INDEX IF NOT EXISTS idx_vsh_video ON video_stats_history(video_id, captured_at);
 CREATE INDEX IF NOT EXISTS idx_csh_channel ON channel_stats_history(channel_id, captured_at);
 CREATE INDEX IF NOT EXISTS idx_chart_snap ON chart_snapshots(captured_at, region, category_id);
+
+-- ---------- v3: swipe file, metadata-review drafts, worker alerts ----------
+
+CREATE TABLE IF NOT EXISTS saved_items (
+    id BIGSERIAL PRIMARY KEY,
+    kind TEXT,              -- 'video' | 'channel'
+    ref_id TEXT,             -- video_id or channel_id
+    folder TEXT,             -- user folder, defaults to 'default'
+    note TEXT,
+    payload TEXT,            -- JSON snapshot of metrics at save time
+    created_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS drafts (
+    id BIGSERIAL PRIMARY KEY,
+    video_id TEXT,           -- filled in once the draft is published and linked
+    title TEXT,
+    description TEXT,
+    tags TEXT,               -- JSON list
+    niche TEXT,
+    channel_id TEXT,
+    is_short INTEGER,
+    review TEXT,             -- JSON snapshot of the signal review at save time
+    created_at TEXT,
+    published_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id BIGSERIAL PRIMARY KEY,
+    kind TEXT,               -- 'outlier' | 'acceleration' | 'title_change' | ...
+    ref_id TEXT,              -- video_id or channel_id the event is about
+    payload TEXT,             -- JSON details
+    created_at TEXT,
+    seen_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_items_kind_ref ON saved_items(kind, ref_id);
+CREATE INDEX IF NOT EXISTS idx_drafts_video ON drafts(video_id);
+CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+CREATE INDEX IF NOT EXISTS idx_events_seen ON events(seen_at);
 """
 
 # columns added to pre-existing tables (name -> DDL type)
@@ -142,6 +186,7 @@ MIGRATIONS = {
         "topic_categories": "TEXT",
         "first_seen_at": "TEXT",
         "live_content": "TEXT",
+        "contains_synthetic_media": "INTEGER",
     },
     "channels": {
         "published_at": "TEXT",

@@ -10,3 +10,7 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+.env.bak-*
+*.bak
+scripts/diag-output.txt
+_to_delete/

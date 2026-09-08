@@ -8,7 +8,7 @@
 #   docker compose up -d postgres web worker   # база + дашборд на http://localhost:8080 + сборщик
 #   docker compose logs -f worker
 #   docker compose run --rm mcp        # MCP server on stdio, for manual testing
-#   docker compose --profile http up -d mcp-http   # MCP over HTTP on :8765
+#   docker compose --profile http up -d mcp-http mcp-https   # MCP over HTTPS on :8765 (/mcp)
 #
 # The worker and the MCP server share the same Postgres database, so whatever
 # the worker collects is immediately visible to the tools.
@@ -171,11 +171,34 @@ services:
       MCP_TRANSPORT: streamable-http
       MCP_HOST: 0.0.0.0
       MCP_PORT: "8765"
+    # No host port here on purpose -- only mcp-https (below) is published to
+    # the host. Plain HTTP stays inside the niche-finder_default network,
+    # reachable by other containers as mcp-http:8765.
+
+  # TLS front door for mcp-http: terminates HTTPS with a locally-trusted
+  # certificate (Caddy's internal CA) so a same-machine client -- e.g. Claude
+  # Desktop configured with {"url": "https://localhost:8765/mcp", "type": "http"} --
+  # gets a real HTTPS URL without a public domain or tunnel.
+  mcp-https:
+    image: caddy:2-alpine
+    container_name: niche-finder-mcp-https
+    profiles: ["http"]
+    restart: unless-stopped
+    depends_on:
+      - mcp-http
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
     ports:
-      - "${MCP_PORT:-8765}:8765"
+      - "127.0.0.1:${MCP_PORT:-8765}:8765"
 
 volumes:
   postgres-data:
     name: niche-finder-postgres-data
   models:
     name: niche-finder-models
+  caddy-data:
+    name: niche-finder-caddy-data
+  caddy-config:
+    name: niche-finder-caddy-config

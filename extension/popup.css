@@ -1,0 +1,27 @@
+body { margin: 0; font: 13px/1.45 "Roboto", system-ui, sans-serif; background: #fff; color: #0f0f0f; }
+@media (prefers-color-scheme: dark) { body { background: #1c1c1c; color: #f1f1f1; } }
+.wrap { width: 320px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+h1 { font-size: 15px; margin: 0; }
+.status { font-size: 12px; padding: 8px; border-radius: 8px; background: rgba(127,127,127,.12); }
+.status.ok { background: rgba(43,166,64,.16); }
+.status.err { background: rgba(198,40,40,.16); }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.field input { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; }
+.check em { display: block; font-style: normal; opacity: .65; font-size: 11px; }
+.row { display: flex; gap: 6px; }
+.btn { font: inherit; font-size: 12px; cursor: pointer; border: none; border-radius: 999px; padding: 6px 12px; background: #065fd4; color: #fff; text-decoration: none; }
+@media (prefers-color-scheme: dark) { .btn { background: #3ea6ff; color: #0f0f0f; } }
+.btn.ghost { background: transparent; color: inherit; border: 1px solid rgba(127,127,127,.4); }
+.foot { font-size: 11px; opacity: .65; }
+
+.field textarea { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit; resize: vertical; }
+.md-details { font-size: 12px; border: 1px solid rgba(127,127,127,.3); border-radius: 8px; padding: 8px 10px; }
+.md-details summary { cursor: pointer; font-weight: 500; }
+.md-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.md-result { display: flex; flex-direction: column; gap: 4px; }
+.md-result .md-summary { opacity: .8; }
+.md-sig { padding: 4px 6px; border-radius: 6px; background: rgba(127,127,127,.12); }
+.md-sig.ok { background: rgba(43,166,64,.16); }
+.md-sig.warn { background: rgba(230,145,0,.18); }
+.md-sig.unreliable { opacity: .65; }

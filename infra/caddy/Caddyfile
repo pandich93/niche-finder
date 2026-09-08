@@ -1,0 +1,8 @@
+# TLS front door for the mcp-http service (see docker-compose.yml).
+# `tls internal` uses Caddy's own local CA -- fine for a same-machine client
+# once that CA is trusted in the OS keychain (see backend/README.md / the
+# "MCP over HTTPS" setup notes for the `caddy trust` step).
+localhost:8765 {
+	tls internal
+	reverse_proxy mcp-http:8765
+}

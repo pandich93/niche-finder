@@ -1,0 +1,186 @@
+/* Панели и значки. Всё под префиксом .nf-, чтобы ничего не пересеклось с
+   собственными стилями YouTube. Тема берётся из атрибута html[dark], который
+   YouTube ставит сам, — поэтому переключение темы работает без перезагрузки. */
+
+.nf-panel {
+  --nf-bg: #ffffff;
+  --nf-fg: #0f0f0f;
+  --nf-muted: #606060;
+  --nf-border: rgba(0, 0, 0, .12);
+  --nf-soft: rgba(0, 0, 0, .05);
+  --nf-accent: #065fd4;
+
+  font-family: "Roboto", "Arial", sans-serif;
+  background: var(--nf-bg);
+  color: var(--nf-fg);
+  border: 1px solid var(--nf-border);
+  border-radius: 12px;
+  margin: 0 0 16px;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+html[dark] .nf-panel {
+  --nf-bg: #1c1c1c;
+  --nf-fg: #f1f1f1;
+  --nf-muted: #aaaaaa;
+  --nf-border: rgba(255, 255, 255, .15);
+  --nf-soft: rgba(255, 255, 255, .07);
+  --nf-accent: #3ea6ff;
+}
+
+#nf-panel-channel { margin: 12px 24px 20px; }
+
+/* -------------------------------------------------------------- шапка */
+
+.nf-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--nf-border);
+  background: var(--nf-soft);
+}
+.nf-logo { font-weight: 700; letter-spacing: .2px; }
+.nf-sub { color: var(--nf-muted); font-size: 12px; }
+.nf-head .nf-chip { margin-left: auto; }
+.nf-icon-btn {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  color: var(--nf-muted); font-size: 16px; line-height: 1; padding: 4px 6px;
+  border-radius: 6px;
+}
+.nf-chip + .nf-icon-btn { margin-left: 0; }
+.nf-icon-btn:hover { background: var(--nf-soft); color: var(--nf-fg); }
+
+.nf-chip {
+  font-size: 11px; color: var(--nf-muted);
+  border: 1px solid var(--nf-border); border-radius: 999px; padding: 2px 8px;
+  white-space: nowrap;
+}
+.nf-chip-api { color: #b26a00; border-color: rgba(178, 106, 0, .4); }
+html[dark] .nf-chip-api { color: #f9ab00; border-color: rgba(249, 171, 0, .4); }
+
+.nf-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+
+/* ------------------------------------------------------------ главный блок */
+
+.nf-hero { display: flex; align-items: center; gap: 12px; }
+.nf-score {
+  font-size: 30px; font-weight: 700; line-height: 1;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--nf-band-bg, var(--nf-soft));
+  color: var(--nf-band-fg, var(--nf-fg));
+  min-width: 88px; text-align: center;
+}
+.nf-band { font-weight: 600; text-transform: lowercase; }
+.nf-hero-txt { min-width: 0; }
+
+.nf-band-1 { --nf-band-bg: rgba(154, 160, 166, .18); --nf-band-fg: #7a7f85; }
+.nf-band-2 { --nf-band-bg: rgba(62, 166, 255, .18);  --nf-band-fg: #1a73e8; }
+.nf-band-3 { --nf-band-bg: rgba(43, 166, 64, .18);   --nf-band-fg: #1e8e3e; }
+.nf-band-4 { --nf-band-bg: rgba(249, 171, 0, .20);   --nf-band-fg: #b26a00; }
+.nf-band-5 { --nf-band-bg: rgba(255, 112, 67, .22);  --nf-band-fg: #d84315; }
+.nf-band-6 { --nf-band-bg: rgba(255, 61, 61, .22);   --nf-band-fg: #c62828; }
+html[dark] .nf-band-2 { --nf-band-fg: #6cbcff; }
+html[dark] .nf-band-3 { --nf-band-fg: #5bd075; }
+html[dark] .nf-band-4 { --nf-band-fg: #f9ab00; }
+html[dark] .nf-band-5 { --nf-band-fg: #ff8a65; }
+html[dark] .nf-band-6 { --nf-band-fg: #ff6b6b; }
+
+/* ----------------------------------------------------------- сетка цифр */
+
+.nf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.nf-cell { background: var(--nf-soft); border-radius: 8px; padding: 8px; }
+.nf-cell-v { font-weight: 600; font-size: 14px; }
+.nf-cell-l { color: var(--nf-muted); font-size: 11px; margin-top: 2px; }
+
+.nf-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.nf-muted { color: var(--nf-muted); }
+.nf-hint { color: var(--nf-muted); font-size: 11.5px; }
+.nf-note { font-size: 12px; padding: 6px 8px; border-radius: 8px; background: var(--nf-soft); }
+.nf-note.nf-hot { background: rgba(255, 112, 67, .16); }
+.nf-note.nf-cold { background: rgba(62, 166, 255, .14); }
+.nf-error { color: #c62828; font-size: 12.5px; }
+html[dark] .nf-error { color: #ff6b6b; }
+
+.nf-channel { border-top: 1px solid var(--nf-border); padding-top: 10px; }
+.nf-ch-title { font-weight: 600; }
+
+/* --------------------------------------------------------------- теги */
+
+.nf-tags { display: flex; flex-wrap: wrap; gap: 4px; max-height: 108px; overflow: auto; }
+.nf-tag {
+  background: var(--nf-soft); border-radius: 6px; padding: 2px 6px;
+  font-size: 11.5px; color: var(--nf-fg);
+}
+.nf-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--nf-accent); font-size: 12px; text-align: left;
+}
+
+/* ------------------------------------------------------------- секции */
+
+.nf-sec { border-top: 1px solid var(--nf-border); padding-top: 10px; }
+.nf-sec-h { font-weight: 600; margin-bottom: 6px; }
+.nf-item {
+  display: flex; align-items: center; gap: 8px; padding: 4px 0;
+  color: inherit; text-decoration: none;
+}
+a.nf-item:hover .nf-item-t { text-decoration: underline; }
+.nf-item-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nf-mult {
+  font-weight: 700; font-size: 12px; padding: 1px 6px; border-radius: 6px;
+  background: var(--nf-band-bg, var(--nf-soft)); color: var(--nf-band-fg, var(--nf-fg));
+  white-space: nowrap;
+}
+.nf-slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.nf-slot {
+  background: var(--nf-soft); border-radius: 8px; padding: 4px 8px; font-size: 12px;
+}
+.nf-slot b { color: var(--nf-accent); margin-left: 4px; }
+
+/* ------------------------------------------------------------- кнопки */
+
+.nf-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.nf-btn {
+  font: inherit; font-size: 12.5px; cursor: pointer;
+  background: var(--nf-accent); color: #fff; border: none;
+  border-radius: 999px; padding: 6px 12px; text-decoration: none;
+}
+.nf-btn:hover { filter: brightness(1.08); }
+.nf-btn:disabled { opacity: .6; cursor: default; }
+.nf-btn.nf-ghost { background: transparent; color: var(--nf-fg); border: 1px solid var(--nf-border); }
+.nf-foot { color: var(--nf-muted); font-size: 11px; }
+
+.nf-skeleton {
+  height: 14px; border-radius: 6px; background: var(--nf-soft);
+  animation: nf-pulse 1.2s ease-in-out infinite;
+}
+.nf-skeleton.nf-short { width: 55%; }
+@keyframes nf-pulse { 50% { opacity: .45; } }
+
+/* ------------------------------------------- значки на карточках видео */
+
+.nf-badge {
+  position: absolute; top: 4px; left: 4px; z-index: 20;
+  font-family: "Roboto", "Arial", sans-serif;
+  font-size: 11px; font-weight: 700; line-height: 1;
+  padding: 3px 6px; border-radius: 6px; pointer-events: none;
+  background: rgba(0, 0, 0, .82); color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
+.nf-badge.nf-band-1 { color: #cfd3d6; }
+.nf-badge.nf-band-2 { color: #6cbcff; }
+.nf-badge.nf-band-3 { color: #5bd075; }
+.nf-badge.nf-band-4 { color: #f9ab00; }
+.nf-badge.nf-band-5 { color: #ff8a65; }
+.nf-badge.nf-band-6 { color: #ff6b6b; }
+
+.nf-badge-vph {
+  top: auto; bottom: 4px; left: 4px; color: #cfe8ff;
+  background: rgba(0, 40, 74, .82); font-weight: 600;
+}
+
+.nf-comments-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.nf-comment { border-top: 1px solid var(--nf-border, #333); padding-top: 6px; }
+.nf-comment-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.nf-comment-t { font-size: 12px; opacity: .85; margin-top: 2px; white-space: pre-wrap; word-break: break-word; }

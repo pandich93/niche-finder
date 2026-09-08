@@ -24,7 +24,7 @@ topic" is done by the model calling these tools, not the server.
 
 ![niche-finder dashboard: overview — channels, videos, outlier channels, trending categories and keywords](assets/dashboard.jpg)
 
-The project has two parts that together make up the "product":
+The project has three parts that together make up the "product":
 
 - **`backend/`** — Python: an MCP server (29 tools for Claude), an HTTP API
   for the dashboard, and a background worker that logs view/subscriber
@@ -32,6 +32,11 @@ The project has two parts that together make up the "product":
   exist — the YouTube API only ever returns "right now").
 - **`frontend/`** — the same functionality, but visual: a dashboard built on
   plain ES modules (no npm, no build step) that calls the backend's HTTP API.
+- **`extension/`** — a Chrome extension (Manifest V3) that puts the same
+  metrics on top of YouTube itself, the way vidIQ and NexLev do: outlier
+  score, view velocity and tags on a watch page, growth and best publishing
+  times on a channel page, multiplier badges on thumbnails in any list. It
+  talks only to `127.0.0.1` — nothing leaves the machine.
 
 Both parts and the Postgres store come up together with one command (see
 below) — the dashboard and Claude Desktop end up looking at the same
@@ -85,6 +90,7 @@ database.
 flowchart LR
     CD["Claude Desktop"] -->|MCP| MCP["MCP server\nbackend/server.py"]
     FE["Browser / frontend"] -->|HTTP| API["HTTP API\nbackend/api.py"]
+    EXT["Chrome extension\non youtube.com"] -->|"HTTP (localhost)"| API
     YT["YouTube Data API v3"] <-->|"on schedule"| W["Background worker\nbackend/worker.py"]
     MCP --> PG[("PostgreSQL")]
     API --> PG
@@ -128,6 +134,7 @@ make local-run                # or: MCP server on the host, for Claude Desktop
 |---|---|
 | [`backend/`](backend/README.md) | MCP server, HTTP API, worker — all the logic and data storage |
 | [`frontend/`](frontend/README.md) | dashboard: index.html, styles.css, ui.js, app.js |
+| [`extension/`](extension/README.md) | Chrome extension: panels and badges on top of YouTube |
 | `docker-compose.yml` | postgres + worker + web + mcp/mcp-http services |
 | `Makefile` | commands to run everything, via Docker or straight on the host |
 | `.env.example` | YouTube key and worker settings |
@@ -156,3 +163,6 @@ See [CHANGELOG.md](CHANGELOG.md) for a history of notable changes, in
   Docker, the DDD layer structure.
 - [frontend/README.md](frontend/README.md) — dashboard screens, where the
   data comes from, how the palette is built.
+- [extension/README.md](extension/README.md) — what the extension shows on
+  each kind of YouTube page, how to load it unpacked, and what it costs in
+  API quota.

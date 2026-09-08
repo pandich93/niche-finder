@@ -106,6 +106,8 @@ def _overview_from_rows(rows: list) -> dict:
 
     small_breakouts = [r for r in rows
                        if (r["subs"] or 0) <= 10000 and r["viewsPerSubscriber"] >= 5]
+    synthetic_known = [r["containsSyntheticMedia"] for r in rows
+                       if r.get("containsSyntheticMedia") is not None]
 
     return {
         "video_count": len(rows),
@@ -127,6 +129,10 @@ def _overview_from_rows(rows: list) -> dict:
         "top_categories": [{"categoryId": c, "category": C.title_for(c), "videos": n}
                            for c, n in top_cats],
         "small_channel_breakouts": len(small_breakouts),
+        "synthetic_content_share_percent": (
+            round(sum(1 for k in synthetic_known if k) / len(synthetic_known) * 100, 1)
+            if synthetic_known else None),
+        "synthetic_disclosure_coverage_percent": round(len(synthetic_known) / len(rows) * 100, 1),
         "top_videos_by_outlier_score": [
             {"videoId": r["video_id"], "title": r["title"], "views": r["view_count"],
              "channel": r["channel_title"], "subscribers": r["subs"],
@@ -229,6 +235,72 @@ def db_stats() -> dict:
     }
     conn.close()
     return out
+
+
+def similar_videos(video_id: str, niche: str = None, limit: int = 10,
+                   exclude_same_channel: bool = False) -> dict:
+    """Videos whose title+description embedding reads closest to this one, in
+    our own corpus (NexLev's "Similar Videos"). Local and free -- zero YouTube
+    quota -- but only as good as what we've actually embedded: a video needs
+    its own embedding (collect_channel/track_channel default to embed=False;
+    backfill_embeddings() fills the gap for free) to be a *candidate*, but the
+    target video needs one too, or there's nothing to compare against.
+    """
+    import infrastructure.embeddings.fastembed_provider as emb
+
+    conn = db.get_conn()
+    row = conn.execute(
+        "SELECT embedding, channel_id FROM videos WHERE video_id=?", (video_id,)).fetchone()
+    if not row or not row["embedding"]:
+        conn.close()
+        return {
+            "video_id": video_id, "similar": [],
+            "hint": ("this video has no embedding yet -- collect_channel/"
+                     "track_channel default to embed=False; run backfill_embeddings, "
+                     "or re-collect with embed=True, to make it eligible"),
+        }
+    target = emb.from_blob(row["embedding"])
+    own_channel = row["channel_id"]
+
+    if niche:
+        sql = ("SELECT v.video_id, v.embedding, v.channel_id, v.title, v.view_count, "
+               "v.published_at FROM videos v "
+               "JOIN video_niches vn ON vn.video_id = v.video_id "
+               "WHERE vn.niche_slug=? AND v.embedding IS NOT NULL AND v.video_id != ?")
+        params = (niche, video_id)
+    else:
+        sql = ("SELECT video_id, embedding, channel_id, title, view_count, published_at "
+               "FROM videos WHERE embedding IS NOT NULL AND video_id != ?")
+        params = (video_id,)
+    rows = conn.execute(sql, params).fetchall()
+
+    scored = []
+    for r in rows:
+        if exclude_same_channel and r["channel_id"] == own_channel:
+            continue
+        vec = emb.from_blob(r["embedding"])
+        scored.append((r, emb.cosine(target, vec)))
+    scored.sort(key=lambda t: t[1], reverse=True)
+
+    out = []
+    channel_cache = {}
+    for r, score in scored[:limit]:
+        cid = r["channel_id"]
+        if cid not in channel_cache:
+            ch = conn.execute(
+                "SELECT title, subscriber_count FROM channels WHERE channel_id=?",
+                (cid,)).fetchone()
+            channel_cache[cid] = dict(ch) if ch else {}
+        ch = channel_cache[cid]
+        out.append({
+            "videoId": r["video_id"], "title": r["title"], "views": r["view_count"],
+            "publishedAt": r["published_at"], "channelId": cid,
+            "channelTitle": ch.get("title"), "channelSubscribers": ch.get("subscriber_count"),
+            "sameChannel": cid == own_channel,
+            "similarity": round(score, 4),
+        })
+    conn.close()
+    return {"video_id": video_id, "candidatesConsidered": len(rows), "similar": out}
 
 
 def similar_channels(channel_id: str, niche: str = None, limit: int = 10,

@@ -7,7 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Chrome extension** (`extension/`, Manifest V3) — vidIQ/NexLev-style
+  panels on top of YouTube, served entirely from the local backend: outlier
+  score against the channel's own median, view velocity and acceleration,
+  views per subscriber, engagement, 30-day projection, revenue range and
+  tags on a watch page; growth, grade, best publishing times, title patterns
+  and similar channels on a channel page; multiplier badges on thumbnails in
+  search, home and recommendations. Network access is limited to
+  `127.0.0.1` by `host_permissions`.
+- **`/api/inspect/video`, `/api/inspect/channel`, `/api/inspect/videos`** —
+  endpoints behind the extension (`backend/application/inspection.py`).
+  They read the local Postgres first and only fall back to a single
+  `videos.list` / `channels.list` call (1 unit each, batched 50 ids per
+  call) when a row is missing or stale — 6h for videos, 24h for channels —
+  storing whatever they fetch, so browsing YouTube also fills the database.
+- **`backend/tests/test_inspection.py`** — 13 tests for the above that need
+  neither Postgres nor an API key (sqlite double for the store, stub for the
+  HTTP client).
+
+### Fixed
+
+- **`scripts/mcp-docker.sh` больше не полагается на `docker run --env-file`.**
+  `docker compose` читает `.env` по правилам dotenv и снимает кавычки вокруг
+  значения, а `docker run --env-file` берёт строку буквально — из-за чего
+  `YOUTUBE_API_KEY="AIza..."` попадал в контейнер вместе с кавычками. Ломался
+  при этом только MCP-сервер (его запускает этот скрипт), а воркер и веб через
+  compose работали как ни в чём не бывало: любой инструмент, ходящий в YouTube
+  Data API, падал, а `db_stats`, `search_outliers` и эмбеддинги отвечали
+  мгновенно. Скрипт теперь разбирает `.env` сам, снимает обрамляющие кавычки
+  (одинарные и двойные), терпит CRLF, комментарии, пустые строки и префикс
+  `export`, и передаёт переменные через `-e`.
+- **`scripts/diag.sh`** — диагностика связки с YouTube API одной командой:
+  `docker ps`, curl к `videoCategories`/`search` с хоста и изнутри контейнера,
+  `cli.py doctor`, логи воркера. Пишет `scripts/diag-output.txt` с
+  замаскированным ключом.
+
+### Changed
+
+- HTTP API now sends CORS headers for `chrome-extension://` origins; it
+  still binds to `127.0.0.1` only.
 
 ## [0.1.0] - 2026-09-06
 

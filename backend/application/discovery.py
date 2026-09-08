@@ -31,6 +31,7 @@ SELECT v.video_id, v.channel_id, v.title, v.tags, v.published_at, v.first_seen_a
        v.view_count,
        v.like_count, v.comment_count, v.duration_seconds, v.thumbnail,
        v.category_id, v.region, v.default_language, v.is_short,
+       v.contains_synthetic_media,
        c.title AS channel_title, c.custom_url AS channel_url,
        c.subscriber_count AS subs, c.video_count AS ch_video_count,
        c.view_count AS ch_view_count, c.country AS channel_country
@@ -210,6 +211,11 @@ def _enrich(conn, rows, ref=None):
         r["categoryId"] = r["category_id"]
         r["category"] = C.title_for(r["category_id"], r["region"] or "US")
         r["isShort"] = r["is_short"]
+        # None = the creator's status.containsSyntheticMedia flag was absent
+        # (old video, or the field wasn't requested) -- distinct from a
+        # deliberate "no" (0), so callers can compute an honest coverage rate.
+        csm = r.get("contains_synthetic_media")
+        r["containsSyntheticMedia"] = bool(csm) if csm is not None else None
         # "viral" = how far past its own subscriber base it went, age-normalised
         r["viralScore"] = round(r["projectedViewsPerSubscriber"], 3)
     return rows
@@ -357,6 +363,20 @@ def _video_out(r):
 
 # ------------------------------------------------ 2. Most popular categories
 
+def _synthetic_share(group) -> dict:
+    """Share of videos in `group` disclosed as containsSyntheticMedia, only
+    over videos where the flag is actually known -- the field is absent for
+    videos collected before the API exposed it (30 Oct 2024) or fetched
+    without part=status, so counting unknowns as "no" would understate it."""
+    known = [r["containsSyntheticMedia"] for r in group if r["containsSyntheticMedia"] is not None]
+    if not known:
+        return {"syntheticSharePercent": None, "syntheticDisclosureCoveragePercent": 0.0}
+    return {
+        "syntheticSharePercent": round(sum(1 for k in known if k) / len(known) * 100, 1),
+        "syntheticDisclosureCoveragePercent": round(len(known) / len(group) * 100, 1),
+    }
+
+
 def most_popular_categories(period="7d", period_by="published", niche=None, region=None,
                             languages=None, max_subscribers=None, exclude_shorts=False,
                             compare_previous=True, rank_by="views",
@@ -411,6 +431,7 @@ def most_popular_categories(period="7d", period_by="published", niche=None, regi
                 M.safe_median([r["viewsPerSubscriber"] for r in group]) or 0, 2),
             "medianEngagementRate": M.safe_median([r["engagementRate"] for r in group]),
             "shortsShare": round(sum(1 for r in group if r["isShort"]) / len(group) * 100, 1),
+            **_synthetic_share(group),
             "estimatedRpmNiche": M.NICHE_RPM.get(C.rpm_niche(cid), M.NICHE_RPM["default"]),
             "topVideos": [{"videoId": r["video_id"], "title": r["title"],
                            "views": r["view_count"], "channel": r["channel_title"]}

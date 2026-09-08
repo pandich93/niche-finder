@@ -16,7 +16,7 @@ _VIDEO_COLS = [
     "video_id", "channel_id", "title", "description", "published_at", "duration_seconds",
     "view_count", "like_count", "comment_count", "thumbnail", "tags", "default_language",
     "embedding", "updated_at", "category_id", "region", "is_short", "topic_categories",
-    "live_content",
+    "live_content", "contains_synthetic_media",
 ]
 
 

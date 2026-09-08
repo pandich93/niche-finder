@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Body
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -28,6 +29,10 @@ from application import collecting as collector
 from application import search as Q
 from application import discovery as trends
 from application import channel_tracking as T
+from application import inspection as I
+from application import library as L
+from application import metadata_review as MR
+from application import alerts as AL
 
 API_KEY = os.environ.get("YOUTUBE_API_KEY", "").strip()
 FRONTEND_DIR = Path(os.environ.get("FRONTEND_DIR")
@@ -42,6 +47,17 @@ db.init_db()
 C.seed_fallback()
 
 app = FastAPI(title="niche-finder", docs_url="/api/docs", openapi_url="/api/openapi.json")
+
+# Расширение для Chrome ходит сюда со своего origin (chrome-extension://...).
+# Service worker с host_permissions обошёлся бы и без CORS, но с заголовками
+# запросы можно отлаживать прямо из консоли страницы. Сервис слушает только
+# 127.0.0.1, поэтому наружу это ничего не открывает.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"chrome-extension://.*",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _need_key():
@@ -244,6 +260,109 @@ def channel_niche_overview(channel_id: str, period: str = "all", limit: int = 15
     return Q.niche_overview_from_channel(channel_id, limit=limit, period=period)
 
 
+@app.get("/api/videos/{video_id}/similar")
+def similar_videos(video_id: str, niche: str = None, limit: int = 10,
+                   exclude_same_channel: bool = False):
+    return Q.similar_videos(video_id, niche=niche, limit=limit,
+                            exclude_same_channel=exclude_same_channel)
+
+
+# ------------------------------------------------------------ swipe file
+
+@app.get("/api/saved")
+def saved_items(kind: str = None, folder: str = None, limit: int = 200):
+    return {"items": L.list_items(kind=kind, folder=folder, limit=limit)}
+
+
+@app.get("/api/saved/folders")
+def saved_folders():
+    return {"folders": L.list_folders()}
+
+
+@app.post("/api/saved")
+def save_item(payload: dict = Body(...)):
+    try:
+        return L.save_item(payload.get("kind"), payload.get("refId") or payload.get("ref_id"),
+                           payload=payload.get("payload"), note=payload.get("note"),
+                           folder=payload.get("folder"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/saved/{item_id}")
+def delete_saved_item(item_id: int):
+    return L.delete_item(item_id)
+
+
+# ---------------------------------------------------- metadata review (8.8)
+
+@app.post("/api/metadata/review")
+def metadata_review(payload: dict = Body(...)):
+    return MR.review_metadata(
+        payload.get("title") or "",
+        description=payload.get("description") or "",
+        tags=payload.get("tags") or [],
+        niche=payload.get("niche"),
+        channel_id=payload.get("channelId") or payload.get("channel_id"),
+        is_short=bool(payload.get("isShort") or payload.get("is_short") or False),
+        period=payload.get("period") or "180d",
+    )
+
+
+@app.post("/api/drafts")
+def create_draft(payload: dict = Body(...)):
+    return MR.save_draft(
+        payload.get("title") or "",
+        description=payload.get("description") or "",
+        tags=payload.get("tags") or [],
+        niche=payload.get("niche"),
+        channel_id=payload.get("channelId") or payload.get("channel_id"),
+        is_short=bool(payload.get("isShort") or payload.get("is_short") or False),
+        review=payload.get("review"),
+    )
+
+
+@app.get("/api/drafts")
+def get_drafts(channel_id: str = None, unpublished_only: bool = False, limit: int = 100):
+    return {"drafts": MR.list_drafts(channel_id=channel_id,
+                                     unpublished_only=unpublished_only, limit=limit)}
+
+
+@app.post("/api/drafts/{draft_id}/link")
+def link_draft(draft_id: int, payload: dict = Body(...)):
+    video_id = payload.get("videoId") or payload.get("video_id")
+    if not video_id:
+        raise HTTPException(status_code=400, detail="videoId required")
+    return MR.link_draft(draft_id, video_id)
+
+
+@app.get("/api/drafts/outcomes")
+def draft_outcomes(min_age_days: float = 7.0):
+    return {"outcomes": MR.draft_outcomes(min_age_days=min_age_days)}
+
+
+# ------------------------------------------------------------- alerts (8.9)
+
+@app.get("/api/events")
+def get_events(unseen_only: bool = False, kind: str = None, limit: int = 100):
+    return {"events": AL.list_events(unseen_only=unseen_only, kind=kind, limit=limit),
+           "unseenCount": AL.unseen_count()}
+
+
+@app.post("/api/events/seen")
+def mark_events_seen(payload: dict = Body(default={})):
+    ids = payload.get("ids")
+    all_unseen = bool(payload.get("all") or not ids)
+    return AL.mark_seen(ids=ids, all_unseen=all_unseen)
+
+
+@app.post("/api/events/scan")
+def scan_events():
+    """Manual trigger -- the worker already runs this on WORKER_ALERTS_INTERVAL_MIN,
+    this is for "check right now" from the dashboard/popup without waiting."""
+    return AL.scan()
+
+
 @app.get("/api/title-changes")
 def title_changes(period: str = "7d", channel_id: str = None, limit: int = 50):
     return T.title_changes(period=period, channel_id=channel_id, limit=limit)
@@ -326,6 +445,29 @@ def track(payload: dict = Body(...)):
 @app.delete("/api/channels/tracked/{channel_id}")
 def untrack(channel_id: str):
     return T.untrack(channel_id)
+
+
+# ------------------------------------- разбор произвольной страницы YouTube
+# Эти три маршрута обслуживают браузерное расширение: пользователь открыл
+# случайный ролик, которого может не быть в базе. Сначала смотрим Postgres,
+# при промахе добираем 1-2 units и сохраняем — см. application/inspection.py.
+
+@app.get("/api/inspect/video")
+def inspect_video(video_id: str, refresh: bool = False, fetch: bool = True):
+    return I.inspect_video(API_KEY, video_id, refresh=refresh, fetch=fetch)
+
+
+@app.get("/api/inspect/channel")
+def inspect_channel(ref: str, refresh: bool = False, fetch: bool = True):
+    return I.inspect_channel(API_KEY, ref, refresh=refresh, fetch=fetch)
+
+
+@app.post("/api/inspect/videos")
+def inspect_videos(payload: dict = Body(...)):
+    ids = payload.get("ids") or []
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="ids должен быть списком")
+    return I.inspect_videos(API_KEY, ids, fetch=bool(payload.get("fetch", True)))
 
 
 # ---------------------------------------------------------------- статика

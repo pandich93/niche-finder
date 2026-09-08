@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
+  <link rel="self" href="https://www.youtube.com/feeds/videos.xml?channel_id=UCabc0000000000000000001"/>
+  <id>yt:channel:UCabc0000000000000000001</id>
+  <yt:channelId>UCabc0000000000000000001</yt:channelId>
+  <title>Demo Channel</title>
+  <entry>
+    <id>yt:video:vidNEW222222</id>
+    <yt:videoId>vidNEW222222</yt:videoId>
+    <yt:channelId>UCabc0000000000000000001</yt:channelId>
+    <title>Самое новое видео</title>
+    <published>2026-09-06T10:00:00+00:00</published>
+  </entry>
+  <entry>
+    <id>yt:video:vidNEW111111</id>
+    <yt:videoId>vidNEW111111</yt:videoId>
+    <yt:channelId>UCabc0000000000000000001</yt:channelId>
+    <title>Видео чуть постарше</title>
+    <published>2026-09-05T10:00:00+00:00</published>
+  </entry>
+  <entry>
+    <id>yt:video:vidOLD000000</id>
+    <yt:videoId>vidOLD000000</yt:videoId>
+    <yt:channelId>UCabc0000000000000000001</yt:channelId>
+    <title>Уже собранное видео</title>
+    <published>2026-09-01T10:00:00+00:00</published>
+  </entry>
+</feed>
