@@ -39,6 +39,11 @@ if [ -n "$ENV_FILE" ]; then
     value=${line#*=}
     case "$name" in
       ''|*[!A-Za-z0-9_]*) continue ;;
+      # NICHE_DATABASE_URL в .env описывает путь к базе С ХОСТА
+      # (localhost:5433). Внутри контейнера localhost -- это сам контейнер, а в
+      # _dsn() этот URL важнее POSTGRES_*, поэтому он бы перебил
+      # POSTGRES_HOST=postgres ниже и сломал MCP-сервер. Оставляем его хосту.
+      NICHE_DATABASE_URL) continue ;;
     esac
     case "$value" in
       '"'*'"') value=${value#\"}; value=${value%\"} ;;

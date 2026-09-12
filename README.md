@@ -126,6 +126,28 @@ make dev                      # HTTP dashboard on http://localhost:8080
 make local-run                # or: MCP server on the host, for Claude Desktop
 ```
 
+Запуск на хосте (`make dev` / `make local-run`) ходит в ту же базу, но по
+другому адресу: контейнер Postgres опубликован на `127.0.0.1:5433`, а дефолт в
+коде -- `localhost:5432`, поэтому без подсказки процесс падает с
+`psycopg2.OperationalError: Connection refused`. Добавьте в `.env` строку
+
+```bash
+NICHE_DATABASE_URL=postgresql://niches:niches@localhost:5433/niches
+```
+
+(`NICHE_DATABASE_URL` важнее `POSTGRES_*` и остаётся хостовым: в контейнеры
+compose его не передаёт, а `scripts/mcp-docker.sh` и `scripts/diag.sh`
+вырезают его явно). **Не** подменяйте это на `POSTGRES_PORT=5433` -- ту же
+переменную compose отдаёт контейнерам как внутрисетевой порт и сломает
+`web`/`worker`/`mcp`.
+
+`make dev` слушает тот же `:8080`, что и контейнер `web`. Держать оба сразу
+нельзя: хостовый uvicorn перехватывает порт, и проброс у контейнера тихо
+отваливается (`docker ps` покажет `8080/tcp` без маппинга). Либо
+`docker compose stop web` перед `make dev`, либо правьте код прямо в
+контейнере -- `./backend` смонтирован внутрь, и `docker compose restart web`
+подхватывает изменения без пересборки.
+
 `make help` prints every available command with a one-line description.
 
 ## Repository layout

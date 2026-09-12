@@ -84,11 +84,19 @@ local-install:  ## venv + deps, without Docker (needs Python 3.10+, auto-detecte
 	  && ./.venv/bin/pip install --upgrade pip \
 	  && ./.venv/bin/pip install -r requirements.txt
 
+# tests/test_smoke.py намеренно не читает .env (ему не нужны ни ключ, ни сеть),
+# поэтому NICHE_DATABASE_URL достаём из .env здесь -- иначе хостовый прогон
+# уходит на localhost:5432 и падает с Connection refused.
 local-test:     ## run the smoke tests on the host
-	cd backend && ./.venv/bin/python tests/test_smoke.py
+	@cd backend && NICHE_DATABASE_URL="$${NICHE_DATABASE_URL:-$$(grep -E '^NICHE_DATABASE_URL=' ../.env 2>/dev/null | sed -E 's/^[^=]+=//; s/^"//; s/"$$//' | tr -d '\r')}" \
+	  ./.venv/bin/python tests/test_smoke.py
 
 local-run:      ## run the MCP server on the host
 	cd backend && ./.venv/bin/python server.py
 
-dev:    ## run the HTTP dashboard on the host, no Docker (needs: make local-install + reachable postgres)
+# Требует в .env строку NICHE_DATABASE_URL=postgresql://niches:niches@localhost:5433/niches
+# (база из compose опубликована на 5433, а дефолт в коде -- 5432) и свободный
+# :8080 -- при поднятом контейнере web сначала `docker compose stop web`,
+# иначе хостовый uvicorn перехватит порт и проброс контейнера тихо отвалится.
+dev:    ## run the HTTP dashboard on the host, no Docker (needs: make local-install + NICHE_DATABASE_URL in .env)
 	cd backend && ./.venv/bin/python -m uvicorn api:app --reload --host 127.0.0.1 --port 8080

@@ -204,6 +204,23 @@ python3 tests/test_smoke.py   # should be 17/17 passed -- needs a reachable
                               # your own; see infrastructure/postgres/connection.py)
 ```
 
+"Reachable Postgres" means a reachable *host* address, and that is not the
+default one: the compose database is published on `127.0.0.1:5433`
+(`POSTGRES_HOST_PORT`), while `_dsn()` falls back to `localhost:5432` --
+hence `psycopg2.OperationalError: Connection refused` straight out of
+`init_db()`. Put the host DSN in the project-root `.env`:
+
+```bash
+NICHE_DATABASE_URL=postgresql://niches:niches@localhost:5433/niches
+```
+
+It wins over `POSTGRES_*` in `_dsn()` and stays host-only on purpose --
+compose does not pass it to containers, and `scripts/mcp-docker.sh` /
+`scripts/diag.sh` strip it before `docker run`, since inside a container
+`localhost` is the container itself. Do **not** use `POSTGRES_PORT=5433`
+instead: compose hands that same variable to the containers as the
+in-network port and breaks `web`/`worker`/`mcp`.
+
 Same thing, shorter, via the Makefile (from the project root):
 
 ```bash

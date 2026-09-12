@@ -20,7 +20,10 @@ KEY=$(grep -E '^YOUTUBE_API_KEY' "$DIR/.env" | sed -E 's/^[^=]+=//; s/"//g' | tr
     "https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&type=video&maxResults=1&key=$KEY" \
     2>&1 | sed "s/$KEY/***KEY***/g" | head -c 1200
   echo; echo "=== 6. тот же вызов ИЗНУТРИ контейнера niche-finder ==="
+  # -e NICHE_DATABASE_URL= гасит хостовый DSN из .env (localhost:5433):
+  # внутри контейнера база доступна только как postgres:5432.
   docker run --rm --network niche-finder_default --env-file "$DIR/.env" \
+    -e NICHE_DATABASE_URL= \
     -v "$DIR/backend:/app:ro" -v niche-finder-models:/models niche-finder:latest \
     python -c "
 import os,time,requests
@@ -37,6 +40,7 @@ except Exception as e:
 " 2>&1 | sed "s/$KEY/***KEY***/g" | head -c 1500
   echo; echo "=== 7. cli.py doctor ==="
   docker run --rm --network niche-finder_default --env-file "$DIR/.env" \
+    -e NICHE_DATABASE_URL= \
     -e POSTGRES_HOST=postgres -v "$DIR/backend:/app:ro" -v niche-finder-models:/models \
     niche-finder:latest python cli.py doctor 2>&1 | sed "s/$KEY/***KEY***/g" | head -c 1500
   echo; echo "=== 8. последние логи worker ==="
