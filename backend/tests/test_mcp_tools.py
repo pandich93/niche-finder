@@ -1,16 +1,18 @@
 """Tests for the MCP tool layer (interfaces/mcp/server.py) and the search-quota
 accounting it depends on. Run with pytest, or directly: python3 tests/test_mcp_tools.py
 
-Same throwaway-schema setup as test_smoke.py -- no YouTube API key and no
-network required (comment_threads is monkeypatched).
+Same throwaway-schema setup as test_smoke.py (tests/schema_scope.py: own schema
+per process, dropped at exit) -- no YouTube API key and no network required
+(comment_threads is monkeypatched).
 """
 import os
 import sys
-import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-os.environ.setdefault("NICHE_DB_SCHEMA", f"nichetest_{uuid.uuid4().hex[:8]}")
+# Выставляет NICHE_DB_SCHEMA (своя одноразовая схема на процесс) и вешает её
+# удаление на atexit -- импорт нужен именно ради этого побочного эффекта.
+import schema_scope  # noqa: F401,E402
 
 import infrastructure.postgres as db              # noqa: E402
 import infrastructure.youtube.client as yt         # noqa: E402

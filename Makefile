@@ -49,7 +49,12 @@ http:   ## expose the MCP server over HTTP on :8765
 shell:  ## shell inside the image, with the models volume mounted
 	docker run --rm -it --network niche-finder_default -v niche-finder-models:/models $(IMAGE) bash
 
+# Схема make_test переиспользуется между запусками, поэтому чистим её ПЕРЕД
+# прогоном: иначе данные прошлого раза ломают тесты, завязанные на свежий
+# discovered_at (make test был зелёным только при первом запуске).
 test:   ## run the smoke tests inside the image, against postgres (needs: make up-db)
+	@$(COMPOSE) exec -T postgres sh -c \
+	  'psql -q -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "DROP SCHEMA IF EXISTS make_test CASCADE"' >/dev/null
 	docker run --rm --network niche-finder_default -e NICHE_DB_SCHEMA=make_test \
 	  -e POSTGRES_HOST=postgres $(IMAGE) python tests/test_smoke.py
 

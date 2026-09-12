@@ -4,16 +4,20 @@ Uses a throwaway Postgres schema seeded with synthetic data -- no YouTube API
 key and no network required, but a reachable Postgres is (see db.py for the
 POSTGRES_HOST / POSTGRES_PORT / POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD
 env vars, or NICHE_DATABASE_URL for a single DSN). Each run gets its own schema
-so it never collides with real data or a concurrent test run.
+so it never collides with real data or a concurrent test run, and drops it again
+when the process exits (see tests/schema_scope.py -- NICHE_KEEP_TEST_SCHEMA=1
+keeps it for post-mortem, and a schema passed in via NICHE_DB_SCHEMA is never
+dropped).
 """
 import json
 import os
 import sys
-import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-os.environ.setdefault("NICHE_DB_SCHEMA", f"nichetest_{uuid.uuid4().hex[:8]}")
+# Выставляет NICHE_DB_SCHEMA (своя одноразовая схема на процесс) и вешает её
+# удаление на atexit -- импорт нужен именно ради этого побочного эффекта.
+import schema_scope  # noqa: F401,E402
 
 import infrastructure.postgres as db          # noqa: E402
 from domain import metrics as M  # noqa: E402
